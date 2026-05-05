@@ -277,7 +277,8 @@ object DailyRewardManager {
         if (!hasWatchedEnoughAds(context)) return@withContext ClaimResult.InsufficientAds
         if (hasReachedWeeklyLimit(context)) return@withContext ClaimResult.WeeklyLimitReached(nextMondayMs())
 
-        val user = GoogleAuthManager.getUser(context)
+        val user = GoogleAuthManager.silentSignIn(context)
+            ?: GoogleAuthManager.getUser(context)
             ?: return@withContext ClaimResult.NetworkError
 
         val requestTs = System.currentTimeMillis()
