@@ -257,7 +257,7 @@ private fun MobileLayout(
             val systemNavHeightDp  = with(density) { navBarInsets.getBottom(density).toDp() }
             val contentBottomPad   = if (showNav) navBarHeightDp + systemNavHeightDp else 0.dp
 
-            Box(modifier = Modifier.weight(1f).nestedScroll(nestedScrollConnection).background(MaterialTheme.colorScheme.background)) {
+            Box(modifier = Modifier.weight(1f).nestedScroll(nestedScrollConnection)) {
                 NavContent(
                     navController = navController,
                     prefManager   = prefManager,
