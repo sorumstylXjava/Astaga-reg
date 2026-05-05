@@ -235,10 +235,21 @@ private fun MobileLayout(
 
     val density           = androidx.compose.ui.platform.LocalDensity.current
     val systemNavHeightDp = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
-    val contentBottomPad  = if (showNav) 58.dp + 8.dp + systemNavHeightDp else 0.dp
+
+    // Banner height ~50dp — NavBar free user harus naik sebesar ini
+    val bannerHeightDp    = if (!isPremium) 50.dp else 0.dp
+
+    // Konten padding: nav bar + (banner kalau free) + system nav
+    val contentBottomPad  = if (showNav)
+        58.dp + 8.dp + bannerHeightDp + systemNavHeightDp
+    else
+        bannerHeightDp + systemNavHeightDp
+
+    // NavBar bottom offset: premium → tepat di atas system nav, free → di atas banner
+    val navBarBottomPad   = systemNavHeightDp + 8.dp + bannerHeightDp
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Konten — background hanya sampai sebelum system nav bar
+        // Konten utama
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -255,13 +266,13 @@ private fun MobileLayout(
             )
         }
 
-        // Nav bar melayang di atas konten, di atas background app
+        // Nav bar melayang — premium: mentok bawah, free: di atas banner
         if (showNav) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = systemNavHeightDp + 8.dp),
+                    .padding(bottom = navBarBottomPad),
                 contentAlignment = Alignment.Center
             ) {
                 JavaProNavBar(
@@ -275,7 +286,7 @@ private fun MobileLayout(
             }
         }
 
-        // Banner ad di atas system nav bar
+        // Banner ad — selalu di paling bawah di atas system nav bar
         if (!isPremium) {
             BannerAdView(
                 modifier = Modifier
