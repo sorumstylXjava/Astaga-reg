@@ -87,17 +87,9 @@ fun MainScreen(
     val context       = LocalContext.current
     val isPremium     = remember { PremiumManager.isPremium(context) }
 
-    // Hapus background system nav bar — biar transparent/tidak ada
-    val view   = androidx.compose.ui.platform.LocalView.current
-    val window = (view.context as? android.app.Activity)?.window
-    SideEffect {
-        window?.let {
-            it.navigationBarColor = android.graphics.Color.TRANSPARENT
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                it.isNavigationBarContrastEnforced = false
-            }
-        }
-    }
+    // enableEdgeToEdge() di MainActivity sudah handle nav bar transparent.
+    // Tidak perlu SideEffect manual di sini — itu yang menyebabkan bug di screen lain.
+
     val windowSize    = rememberWindowSizeInfo()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
