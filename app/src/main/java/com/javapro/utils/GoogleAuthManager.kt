@@ -23,11 +23,15 @@ object GoogleAuthManager {
 
     private const val WEB_CLIENT_ID = "116820814193-93tmjku69ban1mraa0pgo96rd8ff636n.apps.googleusercontent.com"
 
-    private const val PREFS_NAME    = "javapro_google_auth"
-    private const val KEY_EMAIL     = "google_email"
-    private const val KEY_NAME      = "google_name"
-    private const val KEY_PHOTO_URL = "google_photo_url"
-    private const val KEY_ID_TOKEN  = "google_id_token"
+    private const val PREFS_NAME        = "javapro_google_auth"
+    private const val KEY_EMAIL         = "google_email"
+    private const val KEY_NAME          = "google_name"
+    private const val KEY_PHOTO_URL     = "google_photo_url"
+    private const val KEY_ID_TOKEN      = "google_id_token"
+    private const val KEY_TOKEN_SAVED_AT = "google_token_saved_at"
+
+    // idToken Google expired setelah ~1 jam, refresh sebelum itu
+    private const val TOKEN_TTL_MS = 55 * 60 * 1000L // 55 menit
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -36,11 +40,18 @@ object GoogleAuthManager {
 
     private fun saveUser(context: Context, user: GoogleUser) {
         prefs(context).edit()
-            .putString(KEY_EMAIL,     user.email)
-            .putString(KEY_NAME,      user.displayName)
-            .putString(KEY_PHOTO_URL, user.photoUrl)
-            .putString(KEY_ID_TOKEN,  user.idToken)
+            .putString(KEY_EMAIL,          user.email)
+            .putString(KEY_NAME,           user.displayName)
+            .putString(KEY_PHOTO_URL,      user.photoUrl)
+            .putString(KEY_ID_TOKEN,       user.idToken)
+            .putLong(KEY_TOKEN_SAVED_AT,   System.currentTimeMillis())
             .apply()
+    }
+
+    fun isTokenExpired(context: Context): Boolean {
+        val savedAt = prefs(context).getLong(KEY_TOKEN_SAVED_AT, 0L)
+        if (savedAt == 0L) return true
+        return System.currentTimeMillis() - savedAt > TOKEN_TTL_MS
     }
 
     fun getUser(context: Context): GoogleUser? {
@@ -70,15 +81,19 @@ object GoogleAuthManager {
      * Return GoogleUser baru dengan idToken fresh, atau null kalau gagal.
      */
     suspend fun silentSignIn(context: Context): GoogleUser? = withContext(Dispatchers.IO) {
-        // Kalau user sudah tersimpan lokal, pakai data yang ada — tidak perlu hit Credential Manager lagi
         val cached = getUser(context)
-        if (cached != null) return@withContext cached
 
+        // Kalau token masih valid, langsung pakai — tidak perlu network call
+        if (cached != null && !isTokenExpired(context)) {
+            return@withContext cached
+        }
+
+        // Token expired atau belum ada — refresh via Credential Manager (tanpa dialog)
         try {
             val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(true) // hanya akun yang sudah pernah login
+                .setFilterByAuthorizedAccounts(true) // hanya akun yang sudah authorize
                 .setServerClientId(WEB_CLIENT_ID)
-                .setAutoSelectEnabled(true)           // auto pilih tanpa dialog
+                .setAutoSelectEnabled(true)           // auto pilih, tidak tampil dialog
                 .build()
 
             val request = GetCredentialRequest.Builder()
@@ -90,7 +105,7 @@ object GoogleAuthManager {
             val credential        = result.credential
 
             if (credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL)
-                return@withContext null
+                return@withContext cached // fallback ke cached meski expired
 
             val googleCred = GoogleIdTokenCredential.createFrom(credential.data)
             val user = GoogleUser(
@@ -100,11 +115,13 @@ object GoogleAuthManager {
                 idToken     = googleCred.idToken,
             )
 
-            saveUser(context, user)
+            saveUser(context, user) // simpan token baru + update timestamp
             user
 
         } catch (_: Exception) {
-            null
+            // Gagal refresh — fallback ke cached (meski mungkin expired)
+            // Server akan reject kalau benar-benar expired
+            cached
         }
     }
 
