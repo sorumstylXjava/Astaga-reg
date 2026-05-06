@@ -656,7 +656,8 @@ fun HomeScreen(
                     fpsEnabled      = fpsEnabled,
                     isRooted        = isRooted,
                     isShizukuActive = isShizukuActive,
-                    prefManager     = prefManager
+                    prefManager     = prefManager,
+                    navController   = navController
                 )
             }
 
@@ -1018,74 +1019,44 @@ private fun FpsMonitorCard(
     fpsEnabled      : Boolean,
     isRooted        : Boolean,
     isShizukuActive : Boolean,
-    prefManager     : PreferenceManager
+    prefManager     : PreferenceManager,
+    navController   : NavController
 ) {
-    val dimColor    = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.35f)
-    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(0.5f)
+    val accentColor = MaterialTheme.colorScheme.primary
+    val borderColor = accentColor.copy(0.22f)
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(32.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(BorderStroke(0.8.dp, borderColor), RoundedCornerShape(32.dp))
+            .clickable { navController.navigate("fps_stats") }
     ) {
         Column(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 modifier         = Modifier
                     .size(48.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(14.dp)),
+                    .background(accentColor.copy(0.16f), RoundedCornerShape(14.dp))
+                    .border(BorderStroke(1.dp, accentColor.copy(0.3f)), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
-            ) { Icon(Icons.Default.Speed, null, tint = dimColor, modifier = Modifier.size(26.dp)) }
+            ) { Icon(Icons.Default.Speed, null, tint = accentColor, modifier = Modifier.size(26.dp)) }
 
-            Row(
-                verticalAlignment    = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    stringResource(R.string.home_fps_monitor_title),
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 14.sp,
-                    color      = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)
-                )
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Text(
-                        "Soon",
-                        modifier  = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize  = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color     = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)
-                    )
-                }
-            }
+            Text(
+                stringResource(R.string.home_fps_monitor_title),
+                fontWeight = FontWeight.Bold,
+                fontSize   = 14.sp,
+                color      = MaterialTheme.colorScheme.onSurface
+            )
 
             Text(
                 stringResource(R.string.home_show_fps),
                 fontSize   = 11.sp,
-                color      = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.35f),
+                color      = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 15.sp
             )
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.home_fps_off),
-                    fontSize   = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f)
-                )
-                Switch(
-                    checked         = false,
-                    onCheckedChange = null,
-                    enabled         = false,
-                    modifier        = Modifier.height(24.dp),
-                    colors          = SwitchDefaults.colors(
-                        disabledUncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f),
-                        disabledUncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.ChevronRight, null, tint = accentColor.copy(0.7f), modifier = Modifier.size(18.dp))
             }
         }
     }
