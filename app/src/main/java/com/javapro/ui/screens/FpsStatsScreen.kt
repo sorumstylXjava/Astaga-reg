@@ -26,6 +26,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.navigation.NavController
 import com.javapro.fps.*
 import com.javapro.fps.ui.RealtimeLineChart
+import com.javapro.utils.TweakExecutor
 import kotlinx.coroutines.delay
 
 // ──────────────────────────────────────────────────────────────
@@ -45,11 +46,10 @@ data class FpsSession(
 @Composable
 fun FpsStatsScreen(navController: NavController) {
     val context = LocalContext.current
-    val pm = context.packageManager
     val deviceInfo = remember { TweakExecutor.getDeviceInfo(context) }
-    val platform = remember { deviceInfo["soc"] ?: android.os.Build.HARDWARE.uppercase() }
-    val model = remember { android.os.Build.MODEL }
-    val sdk = remember { "SDK ${android.os.Build.VERSION.SDK_INT}" }
+    val platform = remember { (deviceInfo["soc"] ?: android.os.Build.HARDWARE.uppercase()) as String }
+    val model: String = remember { android.os.Build.MODEL }
+    val sdk: String = remember { "SDK ${android.os.Build.VERSION.SDK_INT}" }
 
     var sessions by remember { mutableStateOf<List<FpsSession>>(emptyList()) }
     var showLiveMonitor by remember { mutableStateOf(false) }
