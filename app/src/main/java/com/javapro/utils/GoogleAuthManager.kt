@@ -8,6 +8,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -134,9 +135,19 @@ object GoogleAuthManager {
      * @return GoogleUser jika berhasil, null jika user batal / error
      */
     suspend fun signIn(context: Context): Result<GoogleUser> = withContext(Dispatchers.IO) {
-        try {
+        // Coba dulu dengan GetGoogleIdOption (lebih cepat, pakai akun existing)
+        val result = trySignInWithGoogleIdOption(context)
+        if (result.isSuccess) return@withContext result
+
+        // Fallback ke GetSignInWithGoogleOption (tampil bottom sheet lengkap)
+        // Ini lebih reliable setelah signOut atau fresh install
+        return@withContext trySignInWithGoogleOption(context)
+    }
+
+    private suspend fun trySignInWithGoogleIdOption(context: Context): Result<GoogleUser> {
+        return try {
             val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false) // tampilkan semua akun di device
+                .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(WEB_CLIENT_ID)
                 .setAutoSelectEnabled(false)
                 .build()
@@ -147,28 +158,45 @@ object GoogleAuthManager {
 
             val credentialManager = CredentialManager.create(context)
             val result            = credentialManager.getCredential(context, request)
-            val credential        = result.credential
+            extractUser(result.credential)?.let { Result.success(it).also { r -> saveUser(context, r.getOrNull()!!) } }
+                ?: Result.failure(Exception("Unexpected credential type"))
 
-            if (credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                return@withContext Result.failure(Exception("Unexpected credential type"))
-            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
-            val googleCred = GoogleIdTokenCredential.createFrom(credential.data)
-            val user = GoogleUser(
-                email       = googleCred.id,
-                displayName = googleCred.displayName ?: googleCred.id,
-                photoUrl    = googleCred.profilePictureUri?.toString(),
-                idToken     = googleCred.idToken,
-            )
+    private suspend fun trySignInWithGoogleOption(context: Context): Result<GoogleUser> {
+        return try {
+            val signInOption = GetSignInWithGoogleOption.Builder(WEB_CLIENT_ID).build()
 
-            saveUser(context, user)
-            Result.success(user)
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(signInOption)
+                .build()
+
+            val credentialManager = CredentialManager.create(context)
+            val result            = credentialManager.getCredential(context, request)
+            extractUser(result.credential)?.let { user ->
+                saveUser(context, user)
+                Result.success(user)
+            } ?: Result.failure(Exception("Unexpected credential type"))
 
         } catch (e: GetCredentialException) {
             Result.failure(e)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun extractUser(credential: androidx.credentials.Credential): GoogleUser? {
+        if (credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) return null
+        val googleCred = GoogleIdTokenCredential.createFrom(credential.data)
+        return GoogleUser(
+            email       = googleCred.id,
+            displayName = googleCred.displayName ?: googleCred.id,
+            photoUrl    = googleCred.profilePictureUri?.toString(),
+            idToken     = googleCred.idToken,
+        )
     }
 
     // ── Sign-out ──────────────────────────────────────────────────────────────
