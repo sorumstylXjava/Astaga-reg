@@ -94,8 +94,21 @@ object PremiumManager {
         return try {
             val receivedSig = json.optString("sig", "")
             if (receivedSig.isEmpty()) return false
-            val copy = JSONObject(json.toString()).apply { remove("sig") }
-            val expected = hmacSha256(HMAC_SECRET, copy.toString())
+
+            // Rebuild string PERSIS sama dengan server (check.js):
+            // sorted keys, format: {"key":"value","key2":"value2"}
+            val keys = json.keys().asSequence()
+                .filter { it != "sig" }
+                .sorted()
+                .toList()
+
+            val str = keys.joinToString(",") { k ->
+                val v = json.opt(k)
+                ""$k":"$v""
+            }
+            val payload  = "{$str}"
+            val expected = hmacSha256(HMAC_SECRET, payload)
+
             receivedSig.length == expected.length &&
                 receivedSig.zip(expected).all { (a, b) -> a == b }
         } catch (_: Exception) { false }
