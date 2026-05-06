@@ -81,15 +81,40 @@ private fun isNetworkAvailable(context: Context): Boolean {
     return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }
 
+/**
+ * Mendeteksi apakah DNS ad-blocker aktif.
+ * Mendukung berbagai metode blocking:
+ *   - Redirect ke 0.0.0.0 / 127.0.0.1 (AdAway, hosts file)
+ *   - NXDOMAIN / UnknownHostException (Private DNS, NextDNS, AdGuard DNS)
+ *   - Timeout / drop (beberapa firewall DNS)
+ */
 suspend fun isDnsAdBlockActive(context: Context): Boolean = withContext(Dispatchers.IO) {
     if (!isNetworkAvailable(context)) return@withContext false
     var blockedCount = 0
     for (domain in AD_PROBE_DOMAINS) {
         try {
             val addresses = InetAddress.getAllByName(domain)
-            if (addresses.any { it.hostAddress in BLOCKED_IPS }) blockedCount++
-        } catch (_: Exception) {}
+            // Kasus 1: domain resolve ke IP null/kosong
+            if (addresses.isEmpty()) {
+                blockedCount++
+                continue
+            }
+            // Kasus 2: domain di-redirect ke IP loopback (0.0.0.0 / 127.0.0.1)
+            if (addresses.any { it.hostAddress in BLOCKED_IPS }) {
+                blockedCount++
+            }
+        } catch (_: java.net.UnknownHostException) {
+            // Kasus 3: NXDOMAIN — DNS blocker menolak resolve domain (Private DNS, NextDNS, AdGuard)
+            blockedCount++
+        } catch (_: java.net.SocketTimeoutException) {
+            // Kasus 4: Timeout — DNS drop request
+            blockedCount++
+        } catch (_: Exception) {
+            // Kasus 5: Error lain yang tidak terduga — anggap blocked
+            blockedCount++
+        }
     }
+    // Minimal 2 dari 4 domain terdeteksi blocked → DNS ad-blocker aktif
     blockedCount >= 2
 }
 
@@ -195,7 +220,6 @@ class MainActivity : ComponentActivity() {
             val lang           by prefManager.languageFlow.collectAsState(initial = "en")
             val isDark         by prefManager.darkModeFlow.collectAsState()
 
-
             // isPremium sebagai mutableState agar bisa di-refresh setelah daily reward diklaim
             var isPremium by remember { mutableStateOf(PremiumManager.isPremium(this@MainActivity)) }
 
@@ -217,8 +241,11 @@ class MainActivity : ComponentActivity() {
             }
 
             // ── Deteksi AdBlock + update checker ─────────────────────
+            // isPremium di-capture ke val agar bisa dipakai di dalam coroutine
+            val currentIsPremium = isPremium
             LaunchedEffect(Unit) {
-                if (!isPremium) {
+                // Hanya blok user FREE — premium boleh pakai DNS apapun
+                if (!currentIsPremium) {
                     val adBlockDetected = isDnsAdBlockActive(this@MainActivity)
                     if (adBlockDetected) {
                         showAdBlockDialog = true
@@ -241,7 +268,7 @@ class MainActivity : ComponentActivity() {
                 // ── Dialog: AdBlock detected ──────────────────────────
                 if (showAdBlockDialog) {
                     AlertDialog(
-                        onDismissRequest = {},
+                        onDismissRequest = {}, // Tidak bisa di-dismiss dengan tap di luar
                         containerColor   = Color(0xFF13171F),
                         shape            = RoundedCornerShape(20.dp),
                         title = {
