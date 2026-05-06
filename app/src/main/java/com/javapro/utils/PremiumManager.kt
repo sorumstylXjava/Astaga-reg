@@ -103,8 +103,8 @@ object PremiumManager {
                 .toList()
 
             val str = keys.joinToString(",") { k ->
-                val v = json.opt(k)
-                ""$k":"$v""
+                val v = json.opt(k).toString()
+                buildString { append('"'); append(k); append('"'); append(':'); append('"'); append(v); append('"') }
             }
             val payload  = "{$str}"
             val expected = hmacSha256(HMAC_SECRET, payload)
