@@ -239,14 +239,14 @@ private fun MobileLayout(
     // Banner height ~50dp — NavBar free user harus naik sebesar ini
     val bannerHeightDp    = if (!isPremium) 50.dp else 0.dp
 
-    // Konten padding: nav bar + (banner kalau free) + system nav
+    // Konten padding: nav bar + banner saja — systemNav sudah di-handle enableEdgeToEdge
     val contentBottomPad  = if (showNav)
-        58.dp + 4.dp + bannerHeightDp + systemNavHeightDp
+        58.dp + 4.dp + bannerHeightDp
     else
-        bannerHeightDp + systemNavHeightDp
+        bannerHeightDp
 
-    // NavBar bottom offset: premium → tepat di atas system nav, free → di atas banner
-    val navBarBottomPad   = systemNavHeightDp + 4.dp + bannerHeightDp
+    // NavBar bottom offset: di atas banner + system nav (agar nav bar tidak ketutup gesture handle)
+    val navBarBottomPad   = systemNavHeightDp + bannerHeightDp
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Konten utama
@@ -292,7 +292,7 @@ private fun MobileLayout(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = systemNavHeightDp)
+                    .navigationBarsPadding()
                     .defaultMinSize(minHeight = 50.dp)
             )
         }
