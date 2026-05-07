@@ -198,6 +198,7 @@ fun TweakScreen(lang: String, navController: NavController, onShowAd: (onGranted
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
@@ -206,7 +207,7 @@ fun TweakScreen(lang: String, navController: NavController, onShowAd: (onGranted
                         Text(stringResource(R.string.tweak_subtitle_kernel), fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface, titleContentColor = MaterialTheme.colorScheme.onSurface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface, titleContentColor = MaterialTheme.colorScheme.onSurface),
             )
         }
     ) { padding ->

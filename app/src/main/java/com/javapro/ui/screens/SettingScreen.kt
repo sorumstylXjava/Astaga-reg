@@ -195,6 +195,7 @@ fun SettingScreen(pref: PreferenceManager, navController: NavController, lang: S
 
     Scaffold(
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {

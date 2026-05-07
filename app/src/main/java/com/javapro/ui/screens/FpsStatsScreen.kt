@@ -69,6 +69,7 @@ fun FpsStatsScreen(navController: NavController) {
     val canOverlay     = remember { Settings.canDrawOverlays(context) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text("FPS Stats", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
@@ -88,7 +89,7 @@ fun FpsStatsScreen(navController: NavController) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.background,
                 )
             )
         },

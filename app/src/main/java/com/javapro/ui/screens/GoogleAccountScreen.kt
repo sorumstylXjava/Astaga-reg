@@ -346,6 +346,7 @@ fun GoogleAccountScreen(
 
     Scaffold(
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(text = strTitle, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)) },

@@ -280,7 +280,7 @@ fun MemoryScreen(navController: NavController, lang: String, onShowAd: (onGrante
             title = { Text(stringResource(R.string.appdetail_dexopt_cancel_title), fontWeight = FontWeight.Bold) },
             text = { Text(stringResource(R.string.appdetail_dexopt_irreversible), fontSize = 13.sp) },
             confirmButton = {
-                Button(onClick = { dexOptCancelled = true; showCancelWarning = false; isDexOptRunning = false }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                Button(onClick = { dexOptCancelled = true; showCancelWarning = false; isDexOptRunning = false }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {,
                     Text(stringResource(R.string.appdetail_dexopt_cancel_action))
                 }
             },
@@ -323,6 +323,7 @@ fun MemoryScreen(navController: NavController, lang: String, onShowAd: (onGrante
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.memory_management), fontWeight = FontWeight.Bold) },

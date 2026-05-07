@@ -125,6 +125,7 @@ fun PremiumScreen(navController: NavController, lang: String) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text("Premium", fontWeight = FontWeight.Bold) },

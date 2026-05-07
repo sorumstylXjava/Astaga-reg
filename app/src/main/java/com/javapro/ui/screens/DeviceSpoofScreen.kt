@@ -199,6 +199,7 @@ fun DeviceSpoofScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title          = { Text(stringResource(R.string.spoof_screen_title), fontWeight = FontWeight.Bold) },
@@ -207,7 +208,7 @@ fun DeviceSpoofScreen(
                         Icon(Icons.Filled.ArrowBack, contentDescription = null)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
         containerColor = MaterialTheme.colorScheme.background

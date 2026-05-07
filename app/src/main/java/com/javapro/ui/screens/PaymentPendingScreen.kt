@@ -110,6 +110,7 @@ fun PaymentPendingScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(strTitle, fontWeight = FontWeight.Bold) },
@@ -182,7 +183,7 @@ fun PaymentPendingScreen(
                     onClick  = { navController.popBackStack() },
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = ColorSuccess)
+                    colors   = ButtonDefaults.buttonColors(containerColor = ColorSuccess),
                 ) {
                     Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))

@@ -252,6 +252,7 @@ fun GameBoostScreen(navController: NavController, lang: String) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {

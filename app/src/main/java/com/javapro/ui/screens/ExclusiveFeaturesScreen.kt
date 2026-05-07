@@ -361,6 +361,7 @@ fun ExclusiveFeaturesScreen(navController: NavController, prefManager: Preferenc
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title          = { Text(stringResource(R.string.excl_title), fontWeight = FontWeight.ExtraBold, fontStyle = FontStyle.Italic, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface) },

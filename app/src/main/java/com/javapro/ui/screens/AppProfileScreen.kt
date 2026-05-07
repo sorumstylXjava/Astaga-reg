@@ -79,6 +79,7 @@ fun AppProfileScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.appprofile_app_list), fontWeight = FontWeight.Bold) },

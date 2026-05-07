@@ -590,6 +590,7 @@ fun ScreenRecordScreen(navController: NavController, lang: String) {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {

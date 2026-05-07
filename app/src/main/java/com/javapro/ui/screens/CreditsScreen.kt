@@ -64,6 +64,7 @@ fun CreditsScreen(navController: NavController, lang: String = "en") {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
