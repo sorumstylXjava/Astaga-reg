@@ -4,13 +4,11 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class FpsMonitor(
-    private val executor: ShellExecutor
-) {
+class FpsMonitor(private val executor: ShellExecutor) {
+
     companion object {
         private const val TAG = "FpsMonitor"
         private const val HISTORY_SIZE = 120
-        // Urutan prioritas backend — gfxinfo framestats selalu dicoba duluan
         private val BACKEND_PRIORITY = listOf(
             FpsBackend.GFXINFO_FRAMESTATS,
             FpsBackend.GFXINFO_TOTALFRAMES,
@@ -21,48 +19,53 @@ class FpsMonitor(
         )
     }
 
-    private var activeBackend = FpsBackend.NONE
-    private var backendFailCount = 0
-    private var failReason = ""
-    private var lastShellOutput = ""
-
-    // Untuk GFXINFO_TOTALFRAMES — hitung delta
-    private var lastTotalFrames = -1
+    private var activeBackend     = FpsBackend.NONE
+    private var backendFailCount  = 0
+    private var failReason        = ""
+    private var lastShellOutput   = ""
+    private var lastTotalFrames   = -1
     private var lastTotalFramesMs = 0L
 
-    // Frame history untuk kalkulasi FPS
     private val frameHistory     = RingBuffer<FrameSample>(512)
     private val fpsHistory       = RingBuffer<Float>(HISTORY_SIZE)
     private val frameTimeHistory = RingBuffer<Float>(HISTORY_SIZE)
     private val cpuHistory       = RingBuffer<Float>(HISTORY_SIZE)
     private val gpuHistory       = RingBuffer<Float>(HISTORY_SIZE)
     private val tempHistory      = RingBuffer<Float>(HISTORY_SIZE)
-
-    // GPU reader — multi-path detection dengan cache
-    private val gpuReader = GpuReader(executor)
+    private val gpuReader        = GpuReader(executor)
 
     suspend fun poll(targetPackage: String, refreshRateHz: Float): FpsUiState =
         withContext(Dispatchers.IO) {
 
-            // Pilih backend jika belum ada atau sering gagal
-            if (activeBackend == FpsBackend.NONE || backendFailCount >= 3) {
+            // BUG FIX: pilih backend hanya jika NONE — jangan tiap backendFailCount >= 3
+            // rotateFallback() yang handle pergantian saat gagal
+            if (activeBackend == FpsBackend.NONE) {
+                Log.d(TAG, "FPS_BACKEND_SELECTED: selecting for '$targetPackage'")
                 selectBestBackend(targetPackage)
                 backendFailCount = 0
             }
 
-            val newFrames = fetchFrames(targetPackage)
+            val newFrames = try {
+                fetchFrames(targetPackage)
+            } catch (e: Exception) {
+                Log.e(TAG, "EXCEPTION_STACKTRACE: fetchFrames", e)
+                emptyList()
+            }
 
             if (newFrames.isEmpty()) {
                 backendFailCount++
-                failReason = "No frames from $activeBackend (fail #$backendFailCount)"
-                Log.w(TAG, failReason)
+                failReason = "empty frames: $activeBackend fail=$backendFailCount"
+                Log.w(TAG, "FPS_RESULT: $failReason")
+                // Rotate setelah 3 gagal berturut-turut, lalu reset counter
                 if (backendFailCount >= 3) {
                     rotateFallback()
+                    backendFailCount = 0
                 }
             } else {
                 backendFailCount = 0
                 failReason = ""
                 newFrames.forEach { frameHistory.add(it) }
+                Log.d(TAG, "FPS_RESULT: backend=$activeBackend new=${newFrames.size} total=${frameHistory.size()}")
             }
 
             val allFrames = frameHistory.toList()
@@ -71,27 +74,19 @@ class FpsMonitor(
             fpsHistory.add(stats.currentFps)
             frameTimeHistory.add(stats.frameTimeMs)
 
-            val sysStats = fetchSystemStats()
+            val sysStats = try {
+                fetchSystemStats()
+            } catch (e: Exception) {
+                Log.e(TAG, "EXCEPTION_STACKTRACE: fetchSystemStats", e)
+                SystemStats()
+            }
+
             cpuHistory.add(sysStats.cpuUsage)
-            // Pakai GPU load jika tersedia, fallback ke freq untuk history chart
-            gpuHistory.add(
-                if (sysStats.gpuUsage >= 0f) sysStats.gpuUsage
-                else sysStats.gpuFreqMhz.toFloat()
-            )
+            gpuHistory.add(if (sysStats.gpuUsage >= 0f) sysStats.gpuUsage else sysStats.gpuFreqMhz.toFloat())
             tempHistory.add(sysStats.batteryTempC)
 
-            val debug = DebugInfo(
-                activeBackend     = activeBackend,
-                backendFailReason = failReason,
-                targetPackage     = targetPackage,
-                parsedFrameCount  = newFrames.size,
-                calculatedFps     = stats.currentFps,
-                overlayStatus     = FpsService.overlayStatus,
-                gpuFreqPath       = sysStats.gpuFreqPath,
-                gpuLoadPath       = sysStats.gpuLoadPath,
-                gpuFailReason     = sysStats.gpuFailReason,
-                lastShellOutput   = lastShellOutput.take(300)
-            )
+            Log.d(TAG, "CPU_RESULT: ${sysStats.cpuUsage}% @${sysStats.cpuFreqMhz}MHz")
+            Log.d(TAG, "GPU_RESULT: ${sysStats.gpuFreqMhz}MHz load=${sysStats.gpuUsage}% fail=${sysStats.gpuFailReason}")
 
             FpsUiState(
                 fps              = stats,
@@ -105,24 +100,42 @@ class FpsMonitor(
                 isMonitoring     = true,
                 targetPackage    = targetPackage,
                 refreshRateHz    = refreshRateHz,
-                debug            = debug
+                debug = DebugInfo(
+                    activeBackend     = activeBackend,
+                    backendFailReason = failReason,
+                    targetPackage     = targetPackage,
+                    parsedFrameCount  = newFrames.size,
+                    calculatedFps     = stats.currentFps,
+                    overlayStatus     = FpsService.overlayStatus,
+                    gpuFreqPath       = sysStats.gpuFreqPath,
+                    gpuLoadPath       = sysStats.gpuLoadPath,
+                    gpuFailReason     = sysStats.gpuFailReason,
+                    lastShellOutput   = lastShellOutput.take(300)
+                )
             )
         }
 
-    // ─── Backend selection ──────────────────────────────────────
+    // ─── Backend selection ────────────────────────────────────────
     private suspend fun selectBestBackend(pkg: String) {
-        Log.d(TAG, "Selecting backend for '$pkg'")
         for (backend in BACKEND_PRIORITY) {
-            if (tryBackend(backend, pkg)) {
+            Log.d(TAG, "FPS_BACKEND_SELECTED: trying $backend")
+            val ok = try {
+                tryBackend(backend, pkg)
+            } catch (e: Exception) {
+                Log.w(TAG, "EXCEPTION_STACKTRACE: tryBackend $backend", e)
+                false
+            }
+            if (ok) {
                 activeBackend = backend
-                Log.d(TAG, "Selected backend: $backend")
+                Log.d(TAG, "FPS_BACKEND_SELECTED: ✓ selected=$backend")
                 return
             }
         }
-        // Tidak ada backend valid — tetap di NONE
-        activeBackend = FpsBackend.NONE
-        failReason = "No valid backend found for $pkg"
-        Log.w(TAG, failReason)
+        // Jangan set NONE — paksa GFXINFO_TOTALFRAMES sebagai last resort
+        // karena hampir semua device support dumpsys gfxinfo
+        activeBackend = FpsBackend.GFXINFO_TOTALFRAMES
+        failReason    = "no ideal backend, using GFXINFO_TOTALFRAMES as last resort"
+        Log.w(TAG, "FPS_BACKEND_SELECTED: last resort → $activeBackend")
     }
 
     private suspend fun tryBackend(backend: FpsBackend, pkg: String): Boolean {
@@ -131,57 +144,49 @@ class FpsMonitor(
                 val raw = executor.run("dumpsys gfxinfo $pkg framestats") ?: return false
                 lastShellOutput = raw.take(300)
                 FramestatsParser.isValid(raw)
+                    .also { Log.d(TAG, "tryBackend FRAMESTATS valid=$it len=${raw.length}") }
             }
             FpsBackend.GFXINFO_TOTALFRAMES -> {
                 val raw = executor.run("dumpsys gfxinfo $pkg") ?: return false
                 lastShellOutput = raw.take(300)
                 GfxinfoTotalFramesParser.isValid(raw)
+                    .also { Log.d(TAG, "tryBackend TOTALFRAMES valid=$it len=${raw.length}") }
             }
             FpsBackend.GFXINFO_DRAW_PROCESS -> {
                 val raw = executor.run("dumpsys gfxinfo $pkg") ?: return false
                 lastShellOutput = raw.take(300)
                 DrawProcessParser.isValid(raw)
+                    .also { Log.d(TAG, "tryBackend DRAW_PROCESS valid=$it") }
             }
             FpsBackend.SURFACEFLINGER_LATENCY -> {
-                // Coba beberapa format window name
-                val candidates = listOf(
-                    pkg,
-                    "$pkg/",
-                    "$pkg#0",
-                    // Coba tanpa package — ambil window aktif
-                    ""
-                )
-                for (window in candidates) {
-                    val cmd = if (window.isEmpty())
-                        "dumpsys SurfaceFlinger --latency"
-                    else
-                        "dumpsys SurfaceFlinger --latency \"$window\""
-                    val raw = executor.run(cmd) ?: continue
+                listOf(pkg, "$pkg/", "$pkg#0", "").any { window ->
+                    val cmd = if (window.isEmpty()) "dumpsys SurfaceFlinger --latency"
+                              else "dumpsys SurfaceFlinger --latency \"$window\""
+                    val raw = executor.run(cmd) ?: return@any false
                     lastShellOutput = raw.take(300)
-                    if (SurfaceFlingerParser.isValid(raw)) return true
-                }
-                false
+                    SurfaceFlingerParser.isValid(raw)
+                        .also { if (it) Log.d(TAG, "tryBackend SF_LATENCY valid=true window='$window'") }
+                }.also { if (!it) Log.d(TAG, "tryBackend SF_LATENCY valid=false") }
             }
             FpsBackend.SYSFS_MEASURED_FPS -> {
-                val paths = listOf(
+                listOf(
                     "/sys/class/drm/sde-crtc-0/measured_fps",
                     "/sys/class/drm/card0-DSI-1/measured_fps",
                     "/sys/kernel/gpu/gpu_fps"
-                )
-                paths.any { path ->
-                    val raw = executor.run("cat $path") ?: return@any false
-                    raw.trim().toFloatOrNull()?.let { it > 0f } ?: false
-                }
+                ).any { path ->
+                    (executor.run("cat $path")?.trim()?.toFloatOrNull() ?: 0f) > 0f
+                }.also { Log.d(TAG, "tryBackend SYSFS_FPS valid=$it") }
             }
             FpsBackend.FPSGO -> {
                 val raw = executor.run("cat /proc/fpsgo/fstb/fpsgo_status") ?: return false
-                raw.contains("fps") || raw.contains("FPS")
+                raw.contains("fps", ignoreCase = true)
+                    .also { Log.d(TAG, "tryBackend FPSGO valid=$it") }
             }
             FpsBackend.NONE -> false
         }
     }
 
-    // ─── Fetch frames berdasarkan backend aktif ─────────────────
+    // ─── Fetch frames ──────────────────────────────────────────────
     private suspend fun fetchFrames(pkg: String): List<FrameSample> {
         return when (activeBackend) {
 
@@ -196,31 +201,22 @@ class FpsMonitor(
                 lastShellOutput = raw.take(300)
                 val total = GfxinfoTotalFramesParser.parseTotalFrames(raw) ?: return emptyList()
                 val nowMs = System.currentTimeMillis()
-
                 if (lastTotalFrames < 0) {
-                    // Init — simpan baseline, tidak ada frame untuk dihitung
-                    lastTotalFrames = total
+                    // Pertama kali — simpan baseline
+                    lastTotalFrames   = total
                     lastTotalFramesMs = nowMs
                     return emptyList()
                 }
-
                 val deltaFrames = total - lastTotalFrames
-                val deltaMs = nowMs - lastTotalFramesMs
-
-                lastTotalFrames = total
+                val deltaMs     = nowMs - lastTotalFramesMs
+                lastTotalFrames   = total
                 lastTotalFramesMs = nowMs
-
                 if (deltaFrames <= 0 || deltaMs <= 0) return emptyList()
-
-                // Buat synthetic frame samples dari delta
                 val frameTimeMs = deltaMs.toFloat() / deltaFrames
-                val samples = mutableListOf<FrameSample>()
                 var ts = System.nanoTime() - deltaFrames * (frameTimeMs * 1_000_000).toLong()
-                repeat(deltaFrames.coerceAtMost(128)) {
-                    samples.add(FrameSample(timestamp = ts, frameTimeMs = frameTimeMs))
-                    ts += (frameTimeMs * 1_000_000).toLong()
+                List(deltaFrames.coerceAtMost(128)) {
+                    FrameSample(ts, frameTimeMs).also { ts += (frameTimeMs * 1_000_000).toLong() }
                 }
-                samples
             }
 
             FpsBackend.GFXINFO_DRAW_PROCESS -> {
@@ -230,36 +226,26 @@ class FpsMonitor(
             }
 
             FpsBackend.SURFACEFLINGER_LATENCY -> {
-                val candidates = listOf(pkg, "$pkg/", "$pkg#0")
-                for (window in candidates) {
-                    val raw = executor.run("dumpsys SurfaceFlinger --latency \"$window\"")
-                        ?: continue
+                for (window in listOf(pkg, "$pkg/", "$pkg#0")) {
+                    val raw = executor.run("dumpsys SurfaceFlinger --latency \"$window\"") ?: continue
                     lastShellOutput = raw.take(300)
-                    if (SurfaceFlingerParser.isValid(raw)) {
-                        return SurfaceFlingerParser.parse(raw)
-                    }
+                    if (SurfaceFlingerParser.isValid(raw)) return SurfaceFlingerParser.parse(raw)
                 }
                 emptyList()
             }
 
             FpsBackend.SYSFS_MEASURED_FPS -> {
-                val paths = listOf(
+                for (path in listOf(
                     "/sys/class/drm/sde-crtc-0/measured_fps",
                     "/sys/class/drm/card0-DSI-1/measured_fps",
                     "/sys/kernel/gpu/gpu_fps"
-                )
-                for (path in paths) {
-                    val raw = executor.run("cat $path") ?: continue
-                    val fps = raw.trim().toFloatOrNull() ?: continue
+                )) {
+                    val fps = executor.run("cat $path")?.trim()?.toFloatOrNull() ?: continue
                     if (fps <= 0f) continue
-                    lastShellOutput = raw
-                    // Buat synthetic samples dari fps value
-                    val frameTimeMs = 1000f / fps
+                    val ft  = 1000f / fps
                     val now = System.nanoTime()
-                    return listOf(
-                        FrameSample(now - (frameTimeMs * 1_000_000).toLong(), frameTimeMs),
-                        FrameSample(now, frameTimeMs)
-                    )
+                    lastShellOutput = "$fps"
+                    return listOf(FrameSample(now - (ft * 1_000_000).toLong(), ft), FrameSample(now, ft))
                 }
                 emptyList()
             }
@@ -267,73 +253,65 @@ class FpsMonitor(
             FpsBackend.FPSGO -> {
                 val raw = executor.run("cat /proc/fpsgo/fstb/fpsgo_status") ?: return emptyList()
                 lastShellOutput = raw.take(300)
-                // Parse baris seperti: "pid=XXX fps=60.0"
-                val fpsMatch = Regex("""fps[=:]\s*(\d+\.?\d*)""").find(raw)
-                val fps = fpsMatch?.groupValues?.get(1)?.toFloatOrNull() ?: return emptyList()
+                val fps = Regex("""fps[=:]\s*(\d+\.?\d*)""").find(raw)
+                    ?.groupValues?.get(1)?.toFloatOrNull() ?: return emptyList()
                 if (fps <= 0f) return emptyList()
-                val frameTimeMs = 1000f / fps
+                val ft  = 1000f / fps
                 val now = System.nanoTime()
-                listOf(
-                    FrameSample(now - (frameTimeMs * 1_000_000).toLong(), frameTimeMs),
-                    FrameSample(now, frameTimeMs)
-                )
+                listOf(FrameSample(now - (ft * 1_000_000).toLong(), ft), FrameSample(now, ft))
             }
 
             FpsBackend.NONE -> emptyList()
         }
     }
 
-    // ─── Fallback rotation ─────────────────────────────────────
+    // ─── Fallback rotation ──────────────────────────────────────────
     private fun rotateFallback() {
-        val currentIdx = BACKEND_PRIORITY.indexOf(activeBackend)
-        val nextIdx = (currentIdx + 1) % BACKEND_PRIORITY.size
-        val next = BACKEND_PRIORITY[nextIdx]
-        Log.d(TAG, "Rotate fallback: $activeBackend → $next")
-        failReason = "Rotated from $activeBackend to $next"
+        val idx  = BACKEND_PRIORITY.indexOf(activeBackend).takeIf { it >= 0 } ?: 0
+        val next = BACKEND_PRIORITY[(idx + 1) % BACKEND_PRIORITY.size]
+        Log.w(TAG, "FPS_BACKEND_SELECTED: rotate $activeBackend → $next")
+        failReason    = "rotated: $activeBackend → $next"
         activeBackend = next
         frameHistory.clear()
-        // Reset TotalFrames counter saat ganti backend
-        lastTotalFrames = -1
+        lastTotalFrames   = -1
         lastTotalFramesMs = 0L
     }
 
-    // ─── System stats — pakai GpuReader untuk GPU ──────────────
+    // ─── System stats ───────────────────────────────────────────────
     private suspend fun fetchSystemStats(): SystemStats {
         val cpuFreq = executor.run(
             "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
         )?.trim()?.toLongOrNull()?.div(1000)?.toInt() ?: 0
 
         val cpuUsage = parseCpuUsage()
-
         val gpuInfo  = gpuReader.read()
         val tempC    = fetchBatteryTemp()
 
         return SystemStats(
             cpuUsage      = cpuUsage,
             cpuFreqMhz    = cpuFreq,
-            gpuUsage      = gpuInfo.loadPercent,      // -1 jika tidak terbaca
+            gpuUsage      = gpuInfo.loadPercent,
             gpuFreqMhz    = gpuInfo.freqMhz,
             gpuFreqPath   = gpuInfo.freqPath,
             gpuLoadPath   = gpuInfo.loadPath,
             gpuFailReason = gpuInfo.failReason,
-            batteryTempC  = tempC,
-            powerW        = 0f
+            batteryTempC  = tempC
         )
     }
 
     private suspend fun fetchBatteryTemp(): Float {
         for (zone in 0..5) {
-            val raw = executor.run("cat /sys/class/thermal/thermal_zone$zone/temp")
+            val v = executor.run("cat /sys/class/thermal/thermal_zone$zone/temp")
                 ?.trim()?.toLongOrNull() ?: continue
-            if (raw <= 0L) continue
-            return if (raw > 1000) raw / 1000f else raw.toFloat()
+            if (v <= 0L) continue
+            return if (v > 1000) v / 1000f else v.toFloat()
         }
         return 0f
     }
 
     private suspend fun parseCpuUsage(): Float {
-        val raw = executor.run("cat /proc/stat") ?: return 0f
-        val line = raw.lines().firstOrNull { it.startsWith("cpu ") } ?: return 0f
+        val raw   = executor.run("cat /proc/stat") ?: return 0f
+        val line  = raw.lines().firstOrNull { it.startsWith("cpu ") } ?: return 0f
         val parts = line.trim().split("\\s+".toRegex()).drop(1).mapNotNull { it.toLongOrNull() }
         if (parts.size < 4) return 0f
         val total = parts.sum()
@@ -342,6 +320,7 @@ class FpsMonitor(
     }
 
     fun reset() {
+        Log.d(TAG, "FpsMonitor.reset()")
         activeBackend     = FpsBackend.NONE
         backendFailCount  = 0
         failReason        = ""
