@@ -87,12 +87,6 @@ fun MainScreen(
     val context       = LocalContext.current
     var isPremium     by remember { mutableStateOf(PremiumManager.isPremium(context)) }
 
-    // Re-check premium setiap kali route berubah (misal balik dari GoogleAccountScreen)
-    LaunchedEffect(currentRoute) {
-        val fresh = PremiumManager.isPremium(context)
-        if (fresh != isPremium) isPremium = fresh
-    }
-
     // enableEdgeToEdge() di MainActivity sudah handle nav bar transparent.
     // Tidak perlu SideEffect manual di sini — itu yang menyebabkan bug di screen lain.
 
@@ -100,6 +94,12 @@ fun MainScreen(
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute      = navBackStackEntry?.destination?.route ?: "home"
+
+    // Re-check premium setiap pindah route
+    LaunchedEffect(currentRoute) {
+        val fresh = PremiumManager.isPremium(context)
+        if (fresh != isPremium) isPremium = fresh
+    }
 
     var useFloatingNav by remember { mutableStateOf(getNavBarStyle(context)) }
     LaunchedEffect(currentRoute) { useFloatingNav = getNavBarStyle(context) }
