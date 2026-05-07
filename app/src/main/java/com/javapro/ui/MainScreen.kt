@@ -267,7 +267,6 @@ private fun MobileLayout(
                 onShowAd      = onShowAd,
                 modifier      = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
                     .padding(bottom = contentBottomPad)
             )
         }
