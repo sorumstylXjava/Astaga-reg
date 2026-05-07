@@ -32,7 +32,11 @@ private const val TAG = "BannerAdView"
 @Composable
 fun BannerAdView(modifier: Modifier = Modifier) {
     val context   = LocalContext.current
-    val isPremium = remember { PremiumManager.isPremium(context) }
+    // Cek ulang setiap kali composable masuk ke komposisi
+    var isPremium by remember { mutableStateOf(PremiumManager.isPremium(context)) }
+    LaunchedEffect(Unit) {
+        isPremium = PremiumManager.isPremium(context)
+    }
 
     if (isPremium) return
 

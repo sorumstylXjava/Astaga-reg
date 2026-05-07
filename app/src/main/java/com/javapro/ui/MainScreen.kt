@@ -85,7 +85,13 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
     val context       = LocalContext.current
-    val isPremium     = remember { PremiumManager.isPremium(context) }
+    var isPremium     by remember { mutableStateOf(PremiumManager.isPremium(context)) }
+
+    // Re-check premium setiap kali route berubah (misal balik dari GoogleAccountScreen)
+    LaunchedEffect(currentRoute) {
+        val fresh = PremiumManager.isPremium(context)
+        if (fresh != isPremium) isPremium = fresh
+    }
 
     // enableEdgeToEdge() di MainActivity sudah handle nav bar transparent.
     // Tidak perlu SideEffect manual di sini — itu yang menyebabkan bug di screen lain.
