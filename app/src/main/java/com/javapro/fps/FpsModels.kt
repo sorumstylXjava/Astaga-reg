@@ -24,10 +24,26 @@ data class FpsStats(
 data class SystemStats(
     val cpuUsage: Float = 0f,
     val cpuFreqMhz: Int = 0,
-    val gpuUsage: Float = 0f,
+    val gpuUsage: Float = -1f,       // -1 = tidak terbaca
     val gpuFreqMhz: Int = 0,
+    val gpuFreqPath: String = "--",
+    val gpuLoadPath: String = "--",
+    val gpuFailReason: String = "",
     val batteryTempC: Float = 0f,
     val powerW: Float = 0f
+)
+
+data class DebugInfo(
+    val activeBackend: FpsBackend = FpsBackend.NONE,
+    val backendFailReason: String = "",
+    val targetPackage: String = "",
+    val parsedFrameCount: Int = 0,
+    val calculatedFps: Float = 0f,
+    val overlayStatus: String = "off",
+    val gpuFreqPath: String = "--",
+    val gpuLoadPath: String = "--",
+    val gpuFailReason: String = "",
+    val lastShellOutput: String = ""
 )
 
 data class FpsUiState(
@@ -41,12 +57,16 @@ data class FpsUiState(
     val activeBackend: FpsBackend = FpsBackend.NONE,
     val isMonitoring: Boolean = false,
     val targetPackage: String = "",
-    val refreshRateHz: Float = 60f
+    val refreshRateHz: Float = 60f,
+    val debug: DebugInfo = DebugInfo()
 )
 
 enum class FpsBackend {
     NONE,
-    SURFACEFLINGER_LATENCY,
-    GFXINFO_FRAMESTATS,
-    SURFACEFLINGER_FALLBACK
+    GFXINFO_FRAMESTATS,    // dumpsys gfxinfo <pkg> framestats   — prioritas utama
+    GFXINFO_TOTALFRAMES,   // dumpsys gfxinfo <pkg> — parse "Total frames rendered: X"
+    SURFACEFLINGER_LATENCY,// dumpsys SurfaceFlinger --latency    — hanya jika valid banyak frame
+    GFXINFO_DRAW_PROCESS,  // dumpsys gfxinfo <pkg> — parse baris Draw/Process/Execute
+    SYSFS_MEASURED_FPS,    // /sys/class/drm/.../measured_fps
+    FPSGO                  // /proc/fpsgo/...
 }
