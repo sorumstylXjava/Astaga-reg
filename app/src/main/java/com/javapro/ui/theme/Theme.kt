@@ -22,13 +22,20 @@ fun JavaProTheme(
     val isDarkPref by prefManager.darkModeFlow.collectAsState(initial = true)
     val context = LocalContext.current
 
-    val colorScheme = when {
+    val baseScheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (isDarkPref) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         isDarkPref -> darkColorScheme()
         else -> lightColorScheme()
     }
+
+    val colorScheme = if (isDarkPref) {
+        baseScheme.copy(
+            background = Color.Transparent,
+            surface    = Color.Transparent
+        )
+    } else baseScheme
 
     val view = LocalView.current
     if (!view.isInEditMode) {
