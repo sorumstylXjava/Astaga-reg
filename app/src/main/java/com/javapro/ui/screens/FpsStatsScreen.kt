@@ -76,9 +76,10 @@ data class FpsSession(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FpsStatsScreen(navController: NavController, isPremium: Boolean = false) {
-    val context = LocalContext.current
-    val bg      = rememberFpsBgColors()
+fun FpsStatsScreen(navController: NavController) {
+    val context   = LocalContext.current
+    val bg        = rememberFpsBgColors()
+    val isPremium = remember { com.javapro.utils.PremiumManager.isPremium(context) }
 
     val deviceInfo = remember { TweakExecutor.getDeviceInfo(context) }
     val platform: String = remember { (deviceInfo["soc"] ?: android.os.Build.HARDWARE.uppercase()) as String }
