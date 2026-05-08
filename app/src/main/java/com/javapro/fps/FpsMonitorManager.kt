@@ -3,6 +3,8 @@ package com.javapro.fps
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -34,157 +36,172 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * FpsMonitorManager — SINGLETON.
+ * FpsMonitorManager — SINGLETON GLOBAL.
  *
- * Persistent monitor yang TIDAK terikat lifecycle screen/ViewModel.
- * Screen hanya observe uiState flow.
- * Overlay di-manage di sini — survive navigation, background, game launch.
+ * - Tidak terikat lifecycle screen / Activity / ViewModel
+ * - Monitoring survive: navigate away, reopen, background, game launch
+ * - Overlay di-manage di sini via WindowManager
+ * - Screen hanya observer (collect StateFlow)
  *
- * Usage:
- *   FpsMonitorManager.get(context).startMonitoring("com.example.game")
- *   FpsMonitorManager.get(context).showOverlay(context)
- *   val state by FpsMonitorManager.get(context).uiState.collectAsState()
+ * Overlay architecture:
+ *   ComposeView → WindowManager.addView() langsung
+ *   Bukan dari Activity / Fragment / NavHost
+ *   Survive semua navigation event
  */
-class FpsMonitorManager private constructor(
-    private val appContext: Context
-) : LifecycleOwner, SavedStateRegistryOwner {
+object FpsMonitorManager : LifecycleOwner, SavedStateRegistryOwner {
 
-    companion object {
-        private const val TAG         = "FpsStatsVM"   // sama dengan ViewModel tag agar filter mudah
-        private const val TAG_OVERLAY = "FpsOverlay"
-        private const val POLL_MS     = 500L
-        private const val HEARTBEAT_MS = 5_000L
+    private const val TAG          = "FpsStatsVM"
+    private const val TAG_OVERLAY  = "FpsOverlay"
+    private const val TAG_SERVICE  = "FpsService"
+    private const val POLL_MS      = 500L
+    private const val HEARTBEAT_MS = 5_000L
 
-        @Volatile
-        private var INSTANCE: FpsMonitorManager? = null
-
-        fun get(context: Context): FpsMonitorManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: FpsMonitorManager(context.applicationContext)
-                    .also { INSTANCE = it }
-            }
-        }
-    }
-
-    // ── Lifecycle owner untuk ComposeView overlay ────────────────
+    // ── Lifecycle owner untuk ComposeView overlay ─────────────────
     private val lifecycleRegistry            = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val lifecycle: Lifecycle        get() = lifecycleRegistry
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     init {
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
-        Log.d(TAG, "FpsMonitorManager: singleton created")
+        Log.d(TAG, "FpsMonitorManager: object initialized")
     }
 
-    // ── State ────────────────────────────────────────────────────
+    // ── State ──────────────────────────────────────────────────────
     private val _uiState = MutableStateFlow(FpsUiState())
     val uiState: StateFlow<FpsUiState> = _uiState.asStateFlow()
 
-    val isMonitoring: Boolean get() = pollJob?.isActive == true
+    val isMonitoring: Boolean    get() = pollJob?.isActive == true
     val isOverlayVisible: Boolean get() = overlayView != null
 
-    // ── Internal ─────────────────────────────────────────────────
-    private val scope    = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var pollJob: Job?       = null
-    private var heartbeatJob: Job?  = null
+    // overlayStatus — dibaca dari FpsService.overlayStatus untuk backward compat
+    var overlayStatus: String = "off"
+        private set
+
+    // ── Internal ───────────────────────────────────────────────────
+    // SupervisorJob — satu child crash tidak kill semua
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private var pollJob     : Job? = null
+    private var heartbeatJob: Job? = null
 
     private var windowManager: WindowManager? = null
-    private var overlayView: ComposeView?     = null
-    private var currentPkg  = ""
-    private var refreshHz   = 60f
+    private var overlayView  : ComposeView?   = null
+    private var overlayStateFlow = MutableStateFlow(FpsUiState())
 
-    private val overlayStateFlow = MutableStateFlow(FpsUiState())
+    private var monitor: FpsMonitor? = null
 
-    // ── Start monitoring ─────────────────────────────────────────
+    // ── Start monitoring ──────────────────────────────────────────
     fun startMonitoring(context: Context, targetPackage: String) {
-        Log.d(TAG, "startMonitoring: pkg='$targetPackage' wasRunning=$isMonitoring")
+        Log.d(TAG, "startMonitoring: pkg='$targetPackage' isRunning=$isMonitoring " +
+            "currentPkg='${FpsSessionCache.currentPackage}'")
 
-        if (pollJob?.isActive == true && currentPkg == targetPackage) {
-            Log.d(TAG, "startMonitoring: same pkg already running, skip")
+        // Guard: same package already running
+        if (pollJob?.isActive == true && FpsSessionCache.currentPackage == targetPackage) {
+            Log.d(TAG, "startMonitoring: already running same pkg, skip")
             return
         }
+
+        // Different pkg — cancel old
         if (pollJob?.isActive == true) {
-            Log.d(TAG, "startMonitoring: different pkg, restarting from $currentPkg to $targetPackage")
+            Log.d(TAG, "startMonitoring: switching from ${FpsSessionCache.currentPackage} to $targetPackage")
             pollJob?.cancel()
         }
 
-        currentPkg = targetPackage
-        refreshHz  = RefreshRateDetector.detect(context)
+        FpsSessionCache.currentPackage = targetPackage
+        FpsSessionCache.monitorRunning  = true
 
-        val executor = TweakShellExecutor(context)
-        val monitor  = FpsMonitor(executor)
-        monitor.reset()
-
-        Log.d(TAG, "startMonitoring: launching coroutine hz=$refreshHz")
+        val hz = RefreshRateDetector.detect(context)
+        val exec = TweakShellExecutor(context)
+        val mon  = FpsMonitor(exec)
+        mon.reset()
+        monitor = mon
 
         _uiState.value = FpsUiState(
             isMonitoring  = true,
             targetPackage = targetPackage,
-            refreshRateHz = refreshHz,
-            debug         = DebugInfo(targetPackage = targetPackage, activeBackend = FpsBackend.NONE)
+            refreshRateHz = hz,
+            debug = DebugInfo(
+                targetPackage = targetPackage,
+                activeBackend = FpsBackend.NONE,
+                overlayStatus = overlayStatus
+            )
         )
+        Log.d(TAG, "startMonitoring: state set isMonitoring=true hz=$hz")
 
         pollJob = scope.launch {
-            Log.d(TAG, "MONITOR_TICK: loop started")
+            Log.d(TAG, "MONITOR_TICK: coroutine started pkg=$targetPackage")
             var tick = 0
             while (isActive) {
                 try {
-                    val state = monitor.poll(targetPackage, refreshHz)
-                    _uiState.value       = state
+                    val state = mon.poll(targetPackage, hz)
+                    _uiState.value        = state
                     overlayStateFlow.value = state
+                    FpsSessionCache.updateFromState(state)
                     tick++
                     if (tick == 1 || tick % 10 == 0) {
                         Log.d(TAG, "MONITOR_TICK: #$tick fps=${state.fps.currentFps} " +
-                            "backend=${state.activeBackend} frames=${state.debug.parsedFrameCount}")
+                            "backend=${state.activeBackend} frames=${state.debug.parsedFrameCount} " +
+                            "fail='${state.debug.backendFailReason}'")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "EXCEPTION_STACKTRACE: poll tick=$tick", e)
                     _uiState.value = _uiState.value.copy(
                         debug = _uiState.value.debug.copy(
-                            backendFailReason = "ex: ${e.message?.take(80)}"
+                            backendFailReason = "poll_ex:${e.message?.take(60)}"
                         )
                     )
                 }
                 delay(POLL_MS)
             }
-            Log.w(TAG, "UPDATE_LOOP_STOPPED: loop exited tick=$tick")
+            Log.w(TAG, "UPDATE_LOOP_STOPPED: exited tick=$tick isActive=$isActive")
+            FpsSessionCache.monitorRunning = false
         }
 
-        Log.d(TAG, "startMonitoring: pollJob active=${pollJob?.isActive}")
+        Log.d(TAG, "startMonitoring: pollJob launched active=${pollJob?.isActive}")
     }
 
     fun stopMonitoring() {
-        Log.d(TAG, "stopMonitoring: called")
+        Log.d(TAG, "stopMonitoring: called isRunning=$isMonitoring")
         pollJob?.cancel()
         pollJob = null
-        currentPkg = ""
+        monitor?.reset()
+        monitor = null
+        FpsSessionCache.monitorRunning = false
         _uiState.value = FpsUiState(isMonitoring = false)
     }
 
-    // ── Overlay ──────────────────────────────────────────────────
+    // ── Overlay — WAJIB dipanggil dari Main thread ────────────────
     fun showOverlay(context: Context) {
+        // Pastikan selalu di Main thread
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { showOverlay(context) }
+            return
+        }
+
         Log.d(TAG_OVERLAY, "showOverlay: called isVisible=$isOverlayVisible")
 
         if (!Settings.canDrawOverlays(context)) {
-            Log.w(TAG_OVERLAY, "OVERLAY_FAILED: permission not granted")
-            updateOverlayStatus("no_permission")
+            setOverlayStatus("no_permission")
+            Log.w(TAG_OVERLAY, "OVERLAY_FAILED: permission SYSTEM_ALERT_WINDOW not granted")
             return
         }
 
         if (overlayView != null) {
-            Log.d(TAG_OVERLAY, "OVERLAY_ATTACHED: already visible, skip")
+            Log.d(TAG_OVERLAY, "OVERLAY_ATTACHED: already active, skip addView")
             return
         }
 
         if (windowManager == null) {
-            windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            windowManager = context.applicationContext
+                .getSystemService(Context.WINDOW_SERVICE) as WindowManager
         }
-
         val wm = windowManager!!
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -207,28 +224,31 @@ class FpsMonitorManager private constructor(
 
         Log.d(TAG_OVERLAY, "showOverlay: creating ComposeView type=$type")
 
-        val view = ComposeView(context).apply {
+        val view = ComposeView(context.applicationContext).apply {
             setViewTreeLifecycleOwner(this@FpsMonitorManager)
             setViewTreeSavedStateRegistryOwner(this@FpsMonitorManager)
             visibility = View.VISIBLE
             setContent {
                 val s = overlayStateFlow.collectAsState()
-                // DEBUG LAYER — background merah semi transparan agar terlihat saat testing
+                // ──────────────────────────────────────────────────────
+                // DEBUG OVERLAY — background merah agar visible saat test
+                // Setelah confirmed muncul, ganti dengan FpsBubble
+                // ──────────────────────────────────────────────────────
                 Box(
                     modifier = Modifier
-                        .background(Color.Red.copy(alpha = 0.65f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .background(Color(0xCC000000))  // ubah ke 0xFFFF0000 saat debug
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     val fps = s.value.fps.currentFps
                     Text(
-                        text       = if (fps > 0f) "%.0f FPS".format(fps) else "OVERLAY ACTIVE",
-                        color      = Color.White,
-                        fontSize   = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        text = if (fps > 0f) "%.0f FPS".format(fps) else "-- FPS",
+                        color = if (fps > 0f) Color(0xFF81C784) else Color(0xFF90A4AE),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
-                // ─── Ganti baris di atas dengan FpsBubble setelah overlay confirmed working:
+                // ── Uncomment ini setelah overlay confirmed working ──
                 // com.javapro.fps.ui.FpsBubble(
                 //     fps           = s.value.fps.currentFps,
                 //     refreshRateHz = s.value.refreshRateHz,
@@ -240,57 +260,80 @@ class FpsMonitorManager private constructor(
         try {
             wm.addView(view, params)
             overlayView = view
-            updateOverlayStatus("active")
-            Log.d(TAG_OVERLAY, "OVERLAY_ATTACHED: addView success type=$type")
+            setOverlayStatus("active")
+            FpsSessionCache.overlayVisible = true
+            Log.d(TAG_OVERLAY, "OVERLAY_ATTACHED: addView SUCCESS type=$type")
             startHeartbeat(context)
         } catch (e: Exception) {
-            updateOverlayStatus("addView_error: ${e.message?.take(50)}")
-            Log.e(TAG_OVERLAY, "OVERLAY_FAILED: addView exception", e)
+            setOverlayStatus("addView_error:${e.message?.take(50)}")
+            Log.e(TAG_OVERLAY, "OVERLAY_FAILED: addView EXCEPTION", e)
         }
     }
 
     fun hideOverlay() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { hideOverlay() }
+            return
+        }
         Log.d(TAG_OVERLAY, "hideOverlay: called isVisible=$isOverlayVisible")
         heartbeatJob?.cancel()
         heartbeatJob = null
-        if (overlayView == null) return
-        try {
-            windowManager?.removeViewImmediate(overlayView!!)
-            Log.d(TAG_OVERLAY, "hideOverlay: removed ok")
-        } catch (e: Exception) {
-            Log.e(TAG_OVERLAY, "OVERLAY_FAILED: removeView ${e.message}")
+        overlayView?.let { v ->
+            try {
+                windowManager?.removeViewImmediate(v)
+                Log.d(TAG_OVERLAY, "hideOverlay: removed ok")
+            } catch (e: Exception) {
+                Log.e(TAG_OVERLAY, "OVERLAY_FAILED: removeView exception", e)
+            }
         }
         overlayView = null
-        updateOverlayStatus("off")
+        FpsSessionCache.overlayVisible = false
+        setOverlayStatus("off")
     }
 
-    // ── Heartbeat — auto restore overlay jika hilang ─────────────
+    // ── Heartbeat — auto restore overlay jika hilang ──────────────
     private fun startHeartbeat(context: Context) {
         heartbeatJob?.cancel()
         heartbeatJob = CoroutineScope(Dispatchers.Main).launch {
-            Log.d(TAG_OVERLAY, "heartbeat: started")
+            Log.d(TAG_OVERLAY, "heartbeat: started interval=${HEARTBEAT_MS}ms")
             while (isActive) {
                 delay(HEARTBEAT_MS)
-                if (overlayView == null && Settings.canDrawOverlays(context)) {
+                // Cek overlay masih ada
+                if (overlayView == null && FpsSessionCache.overlayVisible) {
                     Log.w(TAG_OVERLAY, "heartbeat: overlay missing — restoring")
                     showOverlay(context)
+                    Log.d(TAG_OVERLAY, "heartbeat: restore attempted visible=${overlayView != null}")
                 }
-                // Update visibility check
+                // Force visibility jika ada tapi hidden
                 overlayView?.let { v ->
                     if (v.visibility != View.VISIBLE) {
                         v.visibility = View.VISIBLE
-                        Log.w(TAG_OVERLAY, "heartbeat: forced visibility VISIBLE")
+                        Log.w(TAG_OVERLAY, "heartbeat: forced VISIBLE")
                     }
                 }
             }
         }
-        Log.d(TAG_OVERLAY, "heartbeat: job active=${heartbeatJob?.isActive}")
+        Log.d(TAG_OVERLAY, "heartbeat: job started active=${heartbeatJob?.isActive}")
     }
 
-    private fun updateOverlayStatus(status: String) {
-        FpsService.setOverlayStatus(status)
+    fun setOverlayStatus(status: String) {
+        overlayStatus = status
+        Log.d(TAG_OVERLAY, "overlayStatus=$status")
+        // Sync ke FpsService compat field
+        try { FpsService.setOverlayStatus(status) } catch (_: Exception) {}
         _uiState.value = _uiState.value.copy(
             debug = _uiState.value.debug.copy(overlayStatus = status)
         )
+    }
+
+    /**
+     * Dipanggil saat screen dibuka kembali.
+     * Restore UI state dari cache jika monitoring masih jalan.
+     */
+    fun reconnect(): FpsUiState {
+        Log.d(TAG, "reconnect: isMonitoring=$isMonitoring " +
+            "pkg=${FpsSessionCache.currentPackage} " +
+            "lastFps=${FpsSessionCache.lastGoodFps}")
+        return _uiState.value
     }
 }

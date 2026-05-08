@@ -11,55 +11,54 @@ import kotlinx.coroutines.flow.stateIn
 /**
  * FpsStatsViewModel — THIN OBSERVER ONLY.
  *
- * ViewModel ini TIDAK memiliki monitoring lifecycle.
- * Ia hanya merelay StateFlow dari FpsMonitorManager (singleton).
+ * Tidak memiliki coroutine monitoring sendiri.
+ * Semua delegate ke FpsMonitorManager (object singleton).
  *
- * Sehingga:
- * - navigate away  → monitoring tetap jalan di Manager
- * - navigate back  → ViewModel baru, langsung collect state Manager yang masih hidup
- * - screen dispose → onCleared() dipanggil tapi Manager tidak disentuh
+ * onCleared() TIDAK stop monitoring — Manager tetap hidup.
+ * Screen navigate away → ViewModel cleared → Manager tetap poll.
+ * Screen navigate back → ViewModel baru → langsung collect existing state.
  */
-class FpsStatsViewModel(context: Context) : ViewModel() {
+class FpsStatsViewModel(private val context: Context) : ViewModel() {
 
     companion object {
         private const val TAG = "FpsStatsVM"
     }
 
-    private val manager = FpsMonitorManager.get(context)
-
-    // Relay langsung dari singleton — tidak ada state sendiri
-    val uiState: StateFlow<FpsUiState> = manager.uiState.stateIn(
-        scope         = viewModelScope,
-        started       = SharingStarted.WhileSubscribed(5_000L),
-        initialValue  = manager.uiState.value
+    // Relay dari singleton — SharingStarted.Eagerly agar selalu aktif
+    // (bukan WhileSubscribed yang bisa stop jika tidak ada subscriber 5 detik)
+    val uiState: StateFlow<FpsUiState> = FpsMonitorManager.uiState.stateIn(
+        scope        = viewModelScope,
+        started      = SharingStarted.Eagerly,
+        initialValue = FpsMonitorManager.reconnect()
     )
 
-    fun startMonitoring(context: Context, targetPackage: String) {
-        Log.d(TAG, "startMonitoring: delegating to Manager pkg='$targetPackage'")
-        manager.startMonitoring(context, targetPackage)
-    }
-
-    fun showOverlay(context: Context) {
-        Log.d(TAG, "showOverlay: delegating to Manager")
-        manager.showOverlay(context)
+    fun startMonitoring(context: Context, pkg: String) {
+        Log.d(TAG, "startMonitoring → Manager pkg='$pkg'")
+        FpsMonitorManager.startMonitoring(context, pkg)
     }
 
     fun stopMonitoring() {
-        Log.d(TAG, "stopMonitoring: delegating to Manager")
-        manager.stopMonitoring()
+        Log.d(TAG, "stopMonitoring → Manager")
+        FpsMonitorManager.stopMonitoring()
+    }
+
+    fun showOverlay(context: Context) {
+        Log.d(TAG, "showOverlay → Manager")
+        FpsMonitorManager.showOverlay(context)
     }
 
     fun hideOverlay() {
-        Log.d(TAG, "hideOverlay: delegating to Manager")
-        manager.hideOverlay()
+        Log.d(TAG, "hideOverlay → Manager")
+        FpsMonitorManager.hideOverlay()
     }
 
-    val isMonitoring: Boolean get() = manager.isMonitoring
-    val isOverlayVisible: Boolean get() = manager.isOverlayVisible
+    val isMonitoring: Boolean    get() = FpsMonitorManager.isMonitoring
+    val isOverlayVisible: Boolean get() = FpsMonitorManager.isOverlayVisible
 
     override fun onCleared() {
         super.onCleared()
-        // JANGAN stop monitoring di sini — Manager tetap hidup
-        Log.d(TAG, "onCleared: ViewModel cleared, Manager still alive isMonitoring=${manager.isMonitoring}")
+        // JANGAN stop monitoring — Manager independent dari ViewModel lifecycle
+        Log.d(TAG, "onCleared: VM cleared, Manager still alive " +
+            "isMonitoring=${FpsMonitorManager.isMonitoring}")
     }
 }

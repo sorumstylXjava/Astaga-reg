@@ -113,8 +113,15 @@ fun FpsStatsScreen(navController: NavController) {
                 pkgInput      = pkg
                 showPkgDialog = false
                 if (pkg.isNotBlank()) {
+                    // 1. Start monitoring via singleton Manager
                     vm.startMonitoring(context, pkg)
-                    // Langsung show overlay setelah start
+                    // 2. Start foreground service agar survive background/game
+                    val intent = Intent(context, FpsService::class.java).apply {
+                        putExtra(FpsService.EXTRA_PACKAGE, pkg)
+                        putExtra(FpsService.EXTRA_SHOW_OVERLAY, canOverlay)
+                    }
+                    context.startForegroundService(intent)
+                    // 3. Show overlay langsung (jika permission granted)
                     if (canOverlay) vm.showOverlay(context)
                 }
             },
@@ -247,8 +254,13 @@ fun FpsStatsScreen(navController: NavController) {
                     sessions     = sessions,
                     onClearAll   = { sessions = emptyList() },
                     onRecord     = {
-                        if (uiState.isMonitoring) vm.stopMonitoring()
-                        else showPkgDialog = true
+                        if (uiState.isMonitoring) {
+                            vm.stopMonitoring()
+                            vm.hideOverlay()
+                            context.stopService(Intent(context, FpsService::class.java))
+                        } else {
+                            showPkgDialog = true
+                        }
                     },
                     onOverlay = {
                         if (canOverlay) {
