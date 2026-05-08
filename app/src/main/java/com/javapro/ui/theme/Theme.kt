@@ -22,7 +22,7 @@ fun JavaProTheme(
     val isDarkPref by prefManager.darkModeFlow.collectAsState(initial = true)
     val context = LocalContext.current
 
-    val baseScheme = when {
+    val colorScheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (isDarkPref) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
@@ -30,21 +30,18 @@ fun JavaProTheme(
         else -> lightColorScheme()
     }
 
-    val colorScheme = if (isDarkPref) {
-        baseScheme.copy(
-            background = Color.Transparent,
-            surface    = Color.Transparent
-        )
-    } else baseScheme
-
     val view = LocalView.current
     if (!view.isInEditMode) {
+        val bgColor = colorScheme.background.toArgb()
         SideEffect {
             val window = (view.context as Activity).window
             window.navigationBarColor = Color.Transparent.toArgb()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 window.isNavigationBarContrastEnforced = false
             }
+            window.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(bgColor)
+            )
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightNavigationBars = !isDarkPref
             }
