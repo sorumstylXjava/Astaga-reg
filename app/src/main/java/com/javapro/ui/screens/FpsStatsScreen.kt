@@ -132,7 +132,7 @@ fun FpsStatsScreen(navController: NavController) {
                             "FPS Stats",
                             fontWeight = FontWeight.Medium,
                             fontSize = 17.sp,
-                            color = Color.White.copy(alpha = 0.92f)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     },
                     navigationIcon = {
@@ -143,7 +143,7 @@ fun FpsStatsScreen(navController: NavController) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 null,
-                                tint = Color.White.copy(0.75f)
+                                tint = MaterialTheme.colorScheme.onSurface.copy(0.75f)
                             )
                         }
                     },
@@ -152,7 +152,7 @@ fun FpsStatsScreen(navController: NavController) {
                             Icon(
                                 Icons.Default.BugReport,
                                 null,
-                                tint = if (showDebug) clrCyan else Color.White.copy(0.38f),
+                                tint = if (showDebug) clrCyan else MaterialTheme.colorScheme.onSurface.copy(0.38f),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -163,7 +163,7 @@ fun FpsStatsScreen(navController: NavController) {
                 )
             },
             containerColor = Color.Transparent,
-            contentColor = Color.White
+            contentColor = MaterialTheme.colorScheme.onBackground
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -217,7 +217,7 @@ fun FpsStatsScreen(navController: NavController) {
                         "RECORDED SESSIONS",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White.copy(0.35f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.35f),
                         letterSpacing = 1.2.sp,
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                     )
@@ -273,29 +273,29 @@ private fun PackageInputDialog(bg: FpsBgColors,
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = bg.card,
-        title = { Text("Target Package", fontWeight = FontWeight.SemiBold, color = Color.White) },
+        title = { Text("Target Package", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface) },
         text  = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "Masukkan package name aplikasi yang ingin dimonitor FPS-nya.",
                     fontSize = 13.sp,
-                    color    = Color.White.copy(0.55f)
+                    color    = MaterialTheme.colorScheme.onSurface.copy(0.55f)
                 )
                 OutlinedTextField(
                     value         = text,
                     onValueChange = { text = it },
-                    placeholder   = { Text("com.example.game", fontSize = 13.sp, color = Color.White.copy(0.3f)) },
+                    placeholder   = { Text("com.example.game", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.3f)) },
                     singleLine    = true,
                     modifier      = Modifier.fillMaxWidth(),
                     colors        = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor   = clrCyan,
-                        unfocusedBorderColor = Color.White.copy(0.15f),
-                        focusedTextColor     = Color.White,
-                        unfocusedTextColor   = Color.White.copy(0.8f),
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(0.15f),
+                        focusedTextColor     = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor   = MaterialTheme.colorScheme.onSurface.copy(0.8f),
                         cursorColor          = clrCyan
                     )
                 )
-                Text("Quick:", fontSize = 11.sp, color = Color.White.copy(0.35f))
+                Text("Quick:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.35f))
                 listOf(
                     "com.miHoYo.GenshinImpact",
                     "com.pubg.imobile",
@@ -324,7 +324,7 @@ private fun PackageInputDialog(bg: FpsBgColors,
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Batal", color = Color.White.copy(0.5f))
+                Text("Batal", color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
             }
         }
     )
@@ -353,13 +353,13 @@ private fun DeviceChip(bg: FpsBgColors,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(bg.glass)
-            .border(BorderStroke(0.6.dp, Color.White.copy(0.08f)), RoundedCornerShape(20.dp))
+            .border(BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(0.08f)), RoundedCornerShape(20.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        Icon(icon, null, tint = Color.White.copy(0.45f), modifier = Modifier.size(13.dp))
-        Text(label, fontSize = 11.sp, color = Color.White.copy(0.72f), fontWeight = FontWeight.Medium)
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurface.copy(0.45f), modifier = Modifier.size(13.dp))
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.72f), fontWeight = FontWeight.Medium)
     }
 }
 
@@ -395,7 +395,7 @@ private fun HeroFpsCard(bg: FpsBgColors, uiState: FpsUiState) {
                     )
                 )
             )
-            .border(BorderStroke(0.7.dp, Color.White.copy(0.07f)), RoundedCornerShape(24.dp))
+            .border(BorderStroke(0.7.dp, MaterialTheme.colorScheme.outline.copy(0.07f)), RoundedCornerShape(24.dp))
     ) {
         // Subtle glow behind FPS number
         if (fps.currentFps > 0f) {
@@ -425,7 +425,7 @@ private fun HeroFpsCard(bg: FpsBgColors, uiState: FpsUiState) {
                         .ifBlank { uiState.targetPackage },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(0.65f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(0.65f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -464,20 +464,20 @@ private fun HeroFpsCard(bg: FpsBgColors, uiState: FpsUiState) {
                 Text(
                     "${uiState.refreshRateHz.toInt()}Hz",
                     fontSize = 11.sp,
-                    color = Color.White.copy(0.4f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(0.4f)
                 )
                 if (fps.totalFrames > 0) {
-                    Text("•", fontSize = 11.sp, color = Color.White.copy(0.2f))
+                    Text("•", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.2f))
                     Text(
                         "${fps.totalFrames} Frames",
                         fontSize = 11.sp,
-                        color = Color.White.copy(0.4f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.4f)
                     )
                 }
             }
 
             Spacer(Modifier.height(18.dp))
-            HorizontalDivider(color = Color.White.copy(0.06f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(0.06f))
             Spacer(Modifier.height(16.dp))
 
             // Quick stats grid — 2 columns
@@ -533,7 +533,7 @@ private fun StatCard(bg: FpsBgColors, item: StatItem, modifier: Modifier = Modif
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(bg.surface)
-            .border(BorderStroke(0.5.dp, Color.White.copy(0.06f)), RoundedCornerShape(14.dp))
+            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(0.06f)), RoundedCornerShape(14.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -541,7 +541,7 @@ private fun StatCard(bg: FpsBgColors, item: StatItem, modifier: Modifier = Modif
         Text(
             item.label,
             fontSize = 10.sp,
-            color = Color.White.copy(0.38f),
+            color = MaterialTheme.colorScheme.onSurface.copy(0.38f),
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.4.sp
         )
@@ -627,7 +627,7 @@ private fun ChartCard(bg: FpsBgColors,
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(bg.card)
-            .border(BorderStroke(0.6.dp, Color.White.copy(0.06f)), RoundedCornerShape(20.dp))
+            .border(BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(0.06f)), RoundedCornerShape(20.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(
@@ -638,7 +638,7 @@ private fun ChartCard(bg: FpsBgColors,
             Text(
                 label,
                 fontSize = 10.sp,
-                color = Color.White.copy(0.38f),
+                color = MaterialTheme.colorScheme.onSurface.copy(0.38f),
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.sp
             )
@@ -701,7 +701,7 @@ private fun DebugPanel(bg: FpsBgColors, dbg: DebugInfo, sys: SystemStats) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(bg.surface)
-            .border(BorderStroke(0.5.dp, Color.White.copy(0.06f)), RoundedCornerShape(16.dp))
+            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(0.06f)), RoundedCornerShape(16.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
@@ -728,12 +728,12 @@ private fun DebugPanel(bg: FpsBgColors, dbg: DebugInfo, sys: SystemStats) {
         DebugRow(bg = bg, key = "cpu_freq",        value = if (sys.cpuFreqMhz > 0) "${sys.cpuFreqMhz}MHz" else "--")
         DebugRow(bg = bg, key = "temp",            value = if (sys.batteryTempC > 0f) "%.1f°C".format(sys.batteryTempC) else "--")
         Spacer(Modifier.height(4.dp))
-        Text("last_shell:", fontSize = 9.sp, color = Color.White.copy(0.3f))
+        Text("last_shell:", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.3f))
         Text(
             dbg.lastShellOutput.ifEmpty { "(empty)" },
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
-            color = Color.White.copy(0.3f),
+            color = MaterialTheme.colorScheme.onSurface.copy(0.3f),
             lineHeight = 12.sp
         )
     }
@@ -744,12 +744,12 @@ private fun DebugRow(bg: FpsBgColors, key: String, value: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             key, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
-            color = Color.White.copy(0.3f),
+            color = MaterialTheme.colorScheme.onSurface.copy(0.3f),
             modifier = Modifier.width(110.dp)
         )
         Text(
             value, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
-            color = Color.White.copy(0.65f),
+            color = MaterialTheme.colorScheme.onSurface.copy(0.65f),
             maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
@@ -763,7 +763,7 @@ private fun EmptySessionsCard(bg: FpsBgColors, ) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(bg.card)
-            .border(BorderStroke(0.6.dp, Color.White.copy(0.06f)), RoundedCornerShape(24.dp))
+            .border(BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(0.06f)), RoundedCornerShape(24.dp))
             .padding(vertical = 48.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -773,19 +773,19 @@ private fun EmptySessionsCard(bg: FpsBgColors, ) {
         ) {
             Icon(
                 Icons.Default.Speed, null,
-                tint = Color.White.copy(0.12f),
+                tint = MaterialTheme.colorScheme.onSurface.copy(0.12f),
                 modifier = Modifier.size(44.dp)
             )
             Text(
                 "Belum ada sesi terekam",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(0.3f)
+                color = MaterialTheme.colorScheme.onSurface.copy(0.3f)
             )
             Text(
                 "Tap ▶ untuk mulai monitor FPS",
                 fontSize = 11.sp,
-                color = Color.White.copy(0.2f)
+                color = MaterialTheme.colorScheme.onSurface.copy(0.2f)
             )
         }
     }
@@ -806,7 +806,7 @@ private fun SessionCard(bg: FpsBgColors, session: FpsSession, onDelete: () -> Un
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(bg.card)
-            .border(BorderStroke(0.6.dp, Color.White.copy(0.06f)), RoundedCornerShape(16.dp))
+            .border(BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(0.06f)), RoundedCornerShape(16.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -824,7 +824,7 @@ private fun SessionCard(bg: FpsBgColors, session: FpsSession, onDelete: () -> Un
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Android, null,
-                    tint = Color.White.copy(0.3f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(0.3f),
                     modifier = Modifier.size(22.dp))
             }
 
@@ -834,12 +834,12 @@ private fun SessionCard(bg: FpsBgColors, session: FpsSession, onDelete: () -> Un
                 session.appLabel,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = Color.White.copy(0.85f),
+                color = MaterialTheme.colorScheme.onSurface.copy(0.85f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(session.date, fontSize = 11.sp, color = Color.White.copy(0.35f))
+                Text(session.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.35f))
                 if (session.avgFps > 0f)
                     Text(
                         "%.1f FPS".format(session.avgFps),
@@ -849,10 +849,10 @@ private fun SessionCard(bg: FpsBgColors, session: FpsSession, onDelete: () -> Un
                     )
             }
         }
-        Text(dur, fontSize = 11.sp, color = Color.White.copy(0.3f), modifier = Modifier.padding(end = 6.dp))
+        Text(dur, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.3f), modifier = Modifier.padding(end = 6.dp))
         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
             Icon(Icons.Default.Delete, null,
-                tint = Color.White.copy(0.22f),
+                tint = MaterialTheme.colorScheme.onSurface.copy(0.22f),
                 modifier = Modifier.size(17.dp))
         }
     }
@@ -885,7 +885,7 @@ private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
             modifier = Modifier
                 .clip(RoundedCornerShape(50.dp))
                 .background(bg.glass.copy(0.92f))
-                .border(BorderStroke(0.7.dp, Color.White.copy(0.09f)), RoundedCornerShape(50.dp))
+                .border(BorderStroke(0.7.dp, MaterialTheme.colorScheme.outline.copy(0.09f)), RoundedCornerShape(50.dp))
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -908,7 +908,7 @@ private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
                             Text(
                                 currentPkg.substringAfterLast("."),
                                 fontSize = 10.sp,
-                                color = Color.White.copy(0.35f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(0.35f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -917,7 +917,7 @@ private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
                         Text(
                             "Idle",
                             fontSize = 11.sp,
-                            color = Color.White.copy(0.35f)
+                            color = MaterialTheme.colorScheme.onSurface.copy(0.35f)
                         )
                     }
                 }
@@ -929,14 +929,14 @@ private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(0.07f))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(0.07f))
                         .clickable(onClick = onOverlay),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.PictureInPicture,
                         null,
-                        tint = Color.White.copy(0.6f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(0.6f),
                         modifier = Modifier.size(17.dp)
                     )
                 }
@@ -948,14 +948,14 @@ private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(0.07f))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(0.07f))
                         .clickable(onClick = onClearAll),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Delete,
                         null,
-                        tint = Color.White.copy(0.5f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(0.5f),
                         modifier = Modifier.size(17.dp)
                     )
                 }
@@ -978,7 +978,7 @@ private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
                     Icon(
                         if (monitoring) Icons.Default.Stop else Icons.Default.PlayArrow,
                         null,
-                        tint = if (monitoring) Color.White else bg.deep,
+                        tint = if (monitoring) MaterialTheme.colorScheme.onSurface else bg.deep,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1004,7 +1004,7 @@ private fun OverlayPermissionBanner(bg: FpsBgColors, onClick: () -> Unit) {
         Text(
             "Overlay permission diperlukan untuk floating FPS",
             fontSize = 12.sp,
-            color = Color.White.copy(0.65f),
+            color = MaterialTheme.colorScheme.onSurface.copy(0.65f),
             modifier = Modifier.weight(1f)
         )
         TextButton(
