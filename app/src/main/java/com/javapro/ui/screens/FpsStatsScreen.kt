@@ -183,7 +183,7 @@ fun FpsStatsScreen(navController: NavController) {
                 Spacer(Modifier.height(14.dp))
 
                 if (!canOverlay) {
-                    OverlayPermissionBanner {
+                    OverlayPermissionBanner(bg = bg) {
                         context.startActivity(
                             Intent(
                                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
