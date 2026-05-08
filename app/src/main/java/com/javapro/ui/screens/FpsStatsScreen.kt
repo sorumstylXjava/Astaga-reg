@@ -103,9 +103,8 @@ fun FpsStatsScreen(navController: NavController) {
     var pkgInput        by remember { mutableStateOf("") }
     val canOverlay      = remember { Settings.canDrawOverlays(context) }
 
-    DisposableEffect(Unit) {
-        onDispose { vm.stopMonitoring() }
-    }
+    // TIDAK ada DisposableEffect { stopMonitoring() } — monitor hidup di singleton Manager
+    // Screen hanya observer, bukan owner lifecycle monitor
 
     if (showPkgDialog) {
         PackageInputDialog(bg = bg, 
@@ -113,7 +112,11 @@ fun FpsStatsScreen(navController: NavController) {
             onConfirm = { pkg ->
                 pkgInput      = pkg
                 showPkgDialog = false
-                if (pkg.isNotBlank()) vm.startMonitoring(pkg)
+                if (pkg.isNotBlank()) {
+                    vm.startMonitoring(context, pkg)
+                    // Langsung show overlay setelah start
+                    if (canOverlay) vm.showOverlay(context)
+                }
             },
             onDismiss = { showPkgDialog = false }
         )
@@ -137,7 +140,7 @@ fun FpsStatsScreen(navController: NavController) {
                     },
                     navigationIcon = {
                         IconButton(onClick = {
-                            vm.stopMonitoring()
+                            // JANGAN stop monitoring — biarkan Manager tetap jalan
                             navController.popBackStack()
                         }) {
                             Icon(
@@ -248,12 +251,8 @@ fun FpsStatsScreen(navController: NavController) {
                         else showPkgDialog = true
                     },
                     onOverlay = {
-                        if (canOverlay && uiState.targetPackage.isNotBlank()) {
-                            val i = Intent(context, FpsService::class.java).apply {
-                                putExtra(FpsService.EXTRA_PACKAGE, uiState.targetPackage)
-                                putExtra(FpsService.EXTRA_SHOW_OVERLAY, true)
-                            }
-                            context.startForegroundService(i)
+                        if (canOverlay) {
+                            vm.showOverlay(context)
                         }
                     }
                 )

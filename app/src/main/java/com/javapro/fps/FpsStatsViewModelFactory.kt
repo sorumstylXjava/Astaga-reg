@@ -10,7 +10,6 @@ class FpsStatsViewModelFactory(
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        val executor = TweakShellExecutor(context.applicationContext)
-        return FpsStatsViewModel(context.applicationContext, executor) as T
+        return FpsStatsViewModel(context.applicationContext) as T
     }
 }

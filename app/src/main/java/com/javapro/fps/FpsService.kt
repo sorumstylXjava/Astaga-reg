@@ -43,6 +43,12 @@ class FpsService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
         var overlayStatus: String = "off"
             private set
+
+        // Dipanggil dari FpsMonitorManager
+        fun setOverlayStatus(status: String) {
+            overlayStatus = status
+            Log.d("FpsOverlay", "overlayStatus=$status")
+        }
     }
 
     // ── Lifecycle untuk ComposeView ─────────────────────────────
