@@ -255,7 +255,7 @@ private fun MobileLayout(
     val navBarBottomPad   = systemNavHeightDp + bannerHeightDp
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Konten utama
+        // Konten utama — scroll penuh, navbar mengambang di atas
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -265,9 +265,7 @@ private fun MobileLayout(
                 navController = navController,
                 prefManager   = prefManager,
                 onShowAd      = onShowAd,
-                modifier      = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = contentBottomPad)
+                modifier      = Modifier.fillMaxSize()
             )
         }
 

@@ -34,11 +34,26 @@ import com.javapro.fps.*
 import com.javapro.fps.ui.RealtimeLineChart
 import com.javapro.utils.TweakExecutor
 
+// ─── Theme-aware background colors ───────────────────────────────
+private data class FpsBgColors(
+    val deep   : Color,
+    val card   : Color,
+    val surface: Color,
+    val glass  : Color
+)
+
+@Composable
+private fun rememberFpsBgColors(): FpsBgColors {
+    val scheme = MaterialTheme.colorScheme
+    return FpsBgColors(
+        deep    = scheme.background,
+        card    = scheme.surfaceContainer,
+        surface = scheme.surfaceContainerHigh,
+        glass   = scheme.surfaceContainerHighest
+    )
+}
+
 // ─── Color palette ───────────────────────────────────────────────
-private val BgDeep      = Color(0xFF0D1117)
-private val BgCard      = Color(0xFF11161C)
-private val BgSurface   = Color(0xFF151B22)
-private val BgGlass     = Color(0xFF1A2130)
 
 private val clrCyan     = Color(0xFF67C4D8)   // FPS
 private val clrBlue     = Color(0xFF7EB8F7)   // CPU
@@ -63,6 +78,7 @@ data class FpsSession(
 @Composable
 fun FpsStatsScreen(navController: NavController) {
     val context = LocalContext.current
+    val bg      = rememberFpsBgColors()
 
     val deviceInfo = remember { TweakExecutor.getDeviceInfo(context) }
     val platform: String = remember { (deviceInfo["soc"] ?: android.os.Build.HARDWARE.uppercase()) as String }
@@ -91,7 +107,7 @@ fun FpsStatsScreen(navController: NavController) {
     }
 
     if (showPkgDialog) {
-        PackageInputDialog(
+        PackageInputDialog(bg = bg, 
             current   = pkgInput,
             onConfirm = { pkg ->
                 pkgInput      = pkg
@@ -105,7 +121,7 @@ fun FpsStatsScreen(navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDeep)
+            .background(bg.deep)
     ) {
         Scaffold(
             topBar = {
@@ -141,7 +157,7 @@ fun FpsStatsScreen(navController: NavController) {
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = BgDeep
+                        containerColor = bg.deep
                     )
                 )
             },
@@ -157,7 +173,7 @@ fun FpsStatsScreen(navController: NavController) {
             ) {
                 Spacer(Modifier.height(4.dp))
 
-                DeviceInfoChips(
+                DeviceInfoChips(bg = bg, 
                     platform = platform,
                     model    = model,
                     sdk      = sdk,
@@ -179,22 +195,22 @@ fun FpsStatsScreen(navController: NavController) {
                 }
 
                 if (uiState.isMonitoring) {
-                    HeroFpsCard(uiState = uiState)
+                    HeroFpsCard(bg = bg, uiState = uiState)
                     Spacer(Modifier.height(12.dp))
 
                     if (uiState.fpsHistory.size >= 2) {
-                        ChartsSection(uiState = uiState)
+                        ChartsSection(bg = bg, uiState = uiState)
                         Spacer(Modifier.height(12.dp))
                     }
 
                     if (showDebug) {
-                        DebugPanel(dbg = uiState.debug, sys = uiState.system)
+                        DebugPanel(bg = bg, dbg = uiState.debug, sys = uiState.system)
                         Spacer(Modifier.height(12.dp))
                     }
                 }
 
                 if (!uiState.isMonitoring && sessions.isEmpty()) {
-                    EmptySessionsCard()
+                    EmptySessionsCard(bg = bg, )
                 } else if (sessions.isNotEmpty()) {
                     Text(
                         "RECORDED SESSIONS",
@@ -205,7 +221,7 @@ fun FpsStatsScreen(navController: NavController) {
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                     )
                     sessions.forEach { session ->
-                        SessionCard(session = session, onDelete = {
+                        SessionCard(bg = bg, session = session, onDelete = {
                             sessions = sessions.filter { it !== session }
                         })
                         Spacer(Modifier.height(8.dp))
@@ -221,7 +237,7 @@ fun FpsStatsScreen(navController: NavController) {
                     .padding(padding),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                FloatingControlBar(
+                FloatingControlBar(bg = bg, 
                     isMonitoring = uiState.isMonitoring,
                     currentPkg   = uiState.targetPackage,
                     sessions     = sessions,
@@ -247,7 +263,7 @@ fun FpsStatsScreen(navController: NavController) {
 
 // ─── Package input dialog (unchanged logic) ──────────────────────
 @Composable
-private fun PackageInputDialog(
+private fun PackageInputDialog(bg = bg, bg: FpsBgColors, 
     current  : String,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
@@ -255,7 +271,7 @@ private fun PackageInputDialog(
     var text by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = BgCard,
+        containerColor   = bg.card,
         title = { Text("Target Package", fontWeight = FontWeight.SemiBold, color = Color.White) },
         text  = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -302,7 +318,7 @@ private fun PackageInputDialog(
                 onClick = { onConfirm(text.trim()) },
                 colors  = ButtonDefaults.buttonColors(containerColor = clrCyan)
             ) {
-                Text("Start Monitor", color = BgDeep, fontWeight = FontWeight.SemiBold)
+                Text("Start Monitor", color = bg.deep, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
@@ -315,27 +331,27 @@ private fun PackageInputDialog(
 
 // ─── Device info compact chips ────────────────────────────────────
 @Composable
-private fun DeviceInfoChips(platform: String, model: String, sdk: String, hz: String) {
+private fun DeviceInfoChips(bg = bg, bg: FpsBgColors, platform: String, model: String, sdk: String, hz: String) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.horizontalScroll(rememberScrollState())
     ) {
-        DeviceChip(icon = Icons.Default.Memory, label = platform)
-        DeviceChip(icon = Icons.Default.PhoneAndroid, label = model.take(14))
-        DeviceChip(icon = Icons.Default.Android, label = sdk)
-        DeviceChip(icon = Icons.Default.Speed, label = hz)
+        DeviceChip(bg = bg, icon = Icons.Default.Memory, label = platform)
+        DeviceChip(bg = bg, icon = Icons.Default.PhoneAndroid, label = model.take(14))
+        DeviceChip(bg = bg, icon = Icons.Default.Android, label = sdk)
+        DeviceChip(bg = bg, icon = Icons.Default.Speed, label = hz)
     }
 }
 
 @Composable
-private fun DeviceChip(
+private fun DeviceChip(bg = bg, bg: FpsBgColors, 
     icon : androidx.compose.ui.graphics.vector.ImageVector,
     label: String
 ) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(BgGlass)
+            .background(bg.glass)
             .border(BorderStroke(0.6.dp, Color.White.copy(0.08f)), RoundedCornerShape(20.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -348,7 +364,7 @@ private fun DeviceChip(
 
 // ─── Hero FPS card ────────────────────────────────────────────────
 @Composable
-private fun HeroFpsCard(uiState: FpsUiState) {
+private fun HeroFpsCard(bg = bg, bg: FpsBgColors, uiState: FpsUiState) {
     val fps    = uiState.fps
     val sys    = uiState.system
     val clrFps = fpsColor(fps.currentFps, uiState.refreshRateHz)
@@ -373,8 +389,8 @@ private fun HeroFpsCard(uiState: FpsUiState) {
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        BgGlass,
-                        BgCard.copy(0.92f)
+                        bg.glass,
+                        bg.card.copy(0.92f)
                     )
                 )
             )
@@ -413,7 +429,7 @@ private fun HeroFpsCard(uiState: FpsUiState) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                BackendBadge(uiState.activeBackend)
+                BackendBadge(bg = bg, uiState.activeBackend)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -464,14 +480,14 @@ private fun HeroFpsCard(uiState: FpsUiState) {
             Spacer(Modifier.height(16.dp))
 
             // Quick stats grid — 2 columns
-            QuickStatsGrid(fps = fps, sys = sys)
+            QuickStatsGrid(bg = bg, fps = fps, sys = sys)
         }
     }
 }
 
 // ─── Quick stats 2-col grid ───────────────────────────────────────
 @Composable
-private fun QuickStatsGrid(fps: FpsStats, sys: SystemStats) {
+private fun QuickStatsGrid(bg = bg, bg: FpsBgColors, fps: FpsStats, sys: SystemStats) {
     fun fmtFps(v: Float) = if (v > 0f) "%.1f".format(v) else "--"
     fun fmtMs(v: Float)  = if (v > 0f) "%.1f ms".format(v) else "--"
     fun fmtMhz(v: Int)   = if (v > 0) "${v} MHz" else "--"
@@ -500,7 +516,7 @@ private fun QuickStatsGrid(fps: FpsStats, sys: SystemStats) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 row.forEach { item ->
-                    StatCard(item = item, modifier = Modifier.weight(1f))
+                    StatCard(bg = bg, item = item, modifier = Modifier.weight(1f))
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -511,11 +527,11 @@ private fun QuickStatsGrid(fps: FpsStats, sys: SystemStats) {
 private data class StatItem(val label: String, val value: String, val color: Color)
 
 @Composable
-private fun StatCard(item: StatItem, modifier: Modifier = Modifier) {
+private fun StatCard(bg = bg, bg: FpsBgColors, item: StatItem, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(BgSurface)
+            .background(bg.surface)
             .border(BorderStroke(0.5.dp, Color.White.copy(0.06f)), RoundedCornerShape(14.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -541,13 +557,13 @@ private fun StatCard(item: StatItem, modifier: Modifier = Modifier) {
 
 // ─── Charts section ───────────────────────────────────────────────
 @Composable
-private fun ChartsSection(uiState: FpsUiState) {
+private fun ChartsSection(bg = bg, bg: FpsBgColors, uiState: FpsUiState) {
     val fps = uiState.fps
     val sys = uiState.system
     val clrFps = fpsColor(fps.currentFps, uiState.refreshRateHz)
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChartCard(
+        ChartCard(bg = bg, 
             label    = "FPS",
             value    = if (fps.currentFps > 0f) "%.0f FPS".format(fps.currentFps) else "--",
             color    = clrFps,
@@ -555,7 +571,7 @@ private fun ChartsSection(uiState: FpsUiState) {
             maxValue = uiState.refreshRateHz * 1.1f
         )
         if (uiState.frameTimeHistory.size >= 2) {
-            ChartCard(
+            ChartCard(bg = bg, 
                 label = "FRAME TIME",
                 value = if (fps.frameTimeMs > 0f) "%.1f ms".format(fps.frameTimeMs) else "--",
                 color = clrFt,
@@ -564,7 +580,7 @@ private fun ChartsSection(uiState: FpsUiState) {
             )
         }
         if (uiState.cpuHistory.size >= 2) {
-            ChartCard(
+            ChartCard(bg = bg, 
                 label    = "CPU",
                 value    = if (sys.cpuFreqMhz > 0) "${sys.cpuFreqMhz} MHz" else "--",
                 color    = clrBlue,
@@ -575,7 +591,7 @@ private fun ChartsSection(uiState: FpsUiState) {
         }
         if (uiState.gpuHistory.size >= 2) {
             val isLoad = sys.gpuUsage >= 0f
-            ChartCard(
+            ChartCard(bg = bg, 
                 label    = if (isLoad) "GPU LOAD" else "GPU FREQ",
                 value    = if (isLoad) "%.0f%%".format(sys.gpuUsage) else "${sys.gpuFreqMhz} MHz",
                 color    = clrPurple,
@@ -585,7 +601,7 @@ private fun ChartsSection(uiState: FpsUiState) {
             )
         }
         if (uiState.tempHistory.size >= 2) {
-            ChartCard(
+            ChartCard(bg = bg, 
                 label = "TEMPERATURE",
                 value = if (sys.batteryTempC > 0f) "%.0f°C".format(sys.batteryTempC) else "--",
                 color = clrOrange,
@@ -597,7 +613,7 @@ private fun ChartsSection(uiState: FpsUiState) {
 }
 
 @Composable
-private fun ChartCard(
+private fun ChartCard(bg = bg, bg: FpsBgColors, 
     label   : String,
     value   : String,
     color   : Color,
@@ -609,7 +625,7 @@ private fun ChartCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(BgCard)
+            .background(bg.card)
             .border(BorderStroke(0.6.dp, Color.White.copy(0.06f)), RoundedCornerShape(20.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
@@ -646,7 +662,7 @@ private fun ChartCard(
 
 // ─── Backend badge ────────────────────────────────────────────────
 @Composable
-private fun BackendBadge(backend: FpsBackend) {
+private fun BackendBadge(bg = bg, bg: FpsBgColors, backend: FpsBackend) {
     val (label, color) = when (backend) {
         FpsBackend.GFXINFO_FRAMESTATS     -> "GFX Frames"  to clrGreen
         FpsBackend.GFXINFO_TOTALFRAMES    -> "GFX Total"   to clrGreen
@@ -675,7 +691,7 @@ private fun BackendBadge(backend: FpsBackend) {
 
 // ─── Debug panel ─────────────────────────────────────────────────
 @Composable
-private fun DebugPanel(dbg: DebugInfo, sys: SystemStats) {
+private fun DebugPanel(bg = bg, bg: FpsBgColors, dbg: DebugInfo, sys: SystemStats) {
     val context    = LocalContext.current
     val canOverlay = Settings.canDrawOverlays(context)
 
@@ -683,7 +699,7 @@ private fun DebugPanel(dbg: DebugInfo, sys: SystemStats) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(BgSurface)
+            .background(bg.surface)
             .border(BorderStroke(0.5.dp, Color.White.copy(0.06f)), RoundedCornerShape(16.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -696,20 +712,20 @@ private fun DebugPanel(dbg: DebugInfo, sys: SystemStats) {
             letterSpacing = 1.2.sp
         )
         Spacer(Modifier.height(4.dp))
-        DebugRow("active_backend",  dbg.activeBackend.name)
-        DebugRow("fail_reason",     dbg.backendFailReason.ifEmpty { "ok" })
-        DebugRow("target_pkg",      dbg.targetPackage)
-        DebugRow("parsed_frames",   "${dbg.parsedFrameCount}")
-        DebugRow("calculated_fps",  "%.2f".format(dbg.calculatedFps))
-        DebugRow("overlay_perm",    if (canOverlay) "granted" else "DENIED")
-        DebugRow("overlay_status",  FpsService.overlayStatus)
-        DebugRow("gpu_freq_path",   dbg.gpuFreqPath)
-        DebugRow("gpu_load_path",   dbg.gpuLoadPath)
-        DebugRow("gpu_fail",        dbg.gpuFailReason.ifEmpty { "ok" })
-        DebugRow("gpu_freq",        if (sys.gpuFreqMhz > 0) "${sys.gpuFreqMhz}MHz" else "--")
-        DebugRow("gpu_load",        if (sys.gpuUsage >= 0f) "%.1f%%".format(sys.gpuUsage) else "--")
-        DebugRow("cpu_freq",        if (sys.cpuFreqMhz > 0) "${sys.cpuFreqMhz}MHz" else "--")
-        DebugRow("temp",            if (sys.batteryTempC > 0f) "%.1f°C".format(sys.batteryTempC) else "--")
+        DebugRow(bg = bg, "active_backend",  dbg.activeBackend.name)
+        DebugRow(bg = bg, "fail_reason",     dbg.backendFailReason.ifEmpty { "ok" })
+        DebugRow(bg = bg, "target_pkg",      dbg.targetPackage)
+        DebugRow(bg = bg, "parsed_frames",   "${dbg.parsedFrameCount}")
+        DebugRow(bg = bg, "calculated_fps",  "%.2f".format(dbg.calculatedFps))
+        DebugRow(bg = bg, "overlay_perm",    if (canOverlay) "granted" else "DENIED")
+        DebugRow(bg = bg, "overlay_status",  FpsService.overlayStatus)
+        DebugRow(bg = bg, "gpu_freq_path",   dbg.gpuFreqPath)
+        DebugRow(bg = bg, "gpu_load_path",   dbg.gpuLoadPath)
+        DebugRow(bg = bg, "gpu_fail",        dbg.gpuFailReason.ifEmpty { "ok" })
+        DebugRow(bg = bg, "gpu_freq",        if (sys.gpuFreqMhz > 0) "${sys.gpuFreqMhz}MHz" else "--")
+        DebugRow(bg = bg, "gpu_load",        if (sys.gpuUsage >= 0f) "%.1f%%".format(sys.gpuUsage) else "--")
+        DebugRow(bg = bg, "cpu_freq",        if (sys.cpuFreqMhz > 0) "${sys.cpuFreqMhz}MHz" else "--")
+        DebugRow(bg = bg, "temp",            if (sys.batteryTempC > 0f) "%.1f°C".format(sys.batteryTempC) else "--")
         Spacer(Modifier.height(4.dp))
         Text("last_shell:", fontSize = 9.sp, color = Color.White.copy(0.3f))
         Text(
@@ -723,7 +739,7 @@ private fun DebugPanel(dbg: DebugInfo, sys: SystemStats) {
 }
 
 @Composable
-private fun DebugRow(key: String, value: String) {
+private fun DebugRow(bg = bg, bg: FpsBgColors, key: String, value: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             key, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
@@ -740,12 +756,12 @@ private fun DebugRow(key: String, value: String) {
 
 // ─── Empty state ──────────────────────────────────────────────────
 @Composable
-private fun EmptySessionsCard() {
+private fun EmptySessionsCard(bg = bg, bg: FpsBgColors, ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(BgCard)
+            .background(bg.card)
             .border(BorderStroke(0.6.dp, Color.White.copy(0.06f)), RoundedCornerShape(24.dp))
             .padding(vertical = 48.dp),
         contentAlignment = Alignment.Center
@@ -776,7 +792,7 @@ private fun EmptySessionsCard() {
 
 // ─── Session card ─────────────────────────────────────────────────
 @Composable
-private fun SessionCard(session: FpsSession, onDelete: () -> Unit) {
+private fun SessionCard(bg = bg, bg: FpsBgColors, session: FpsSession, onDelete: () -> Unit) {
     val iconBitmap = remember(session.packageName) { session.icon?.toBitmap()?.asImageBitmap() }
     val clr = fpsColor(session.avgFps, 60f)
     val dur = remember(session.duration) {
@@ -788,7 +804,7 @@ private fun SessionCard(session: FpsSession, onDelete: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(BgCard)
+            .background(bg.card)
             .border(BorderStroke(0.6.dp, Color.White.copy(0.06f)), RoundedCornerShape(16.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -803,7 +819,7 @@ private fun SessionCard(session: FpsSession, onDelete: () -> Unit) {
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(BgSurface),
+                    .background(bg.surface),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Android, null,
@@ -843,7 +859,7 @@ private fun SessionCard(session: FpsSession, onDelete: () -> Unit) {
 
 // ─── Floating control bar ─────────────────────────────────────────
 @Composable
-private fun FloatingControlBar(
+private fun FloatingControlBar(bg = bg, bg: FpsBgColors, 
     isMonitoring: Boolean,
     currentPkg  : String,
     sessions    : List<FpsSession>,
@@ -866,7 +882,7 @@ private fun FloatingControlBar(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(50.dp))
-                .background(BgGlass.copy(0.92f))
+                .background(bg.glass.copy(0.92f))
                 .border(BorderStroke(0.7.dp, Color.White.copy(0.09f)), RoundedCornerShape(50.dp))
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -960,7 +976,7 @@ private fun FloatingControlBar(
                     Icon(
                         if (monitoring) Icons.Default.Stop else Icons.Default.PlayArrow,
                         null,
-                        tint = if (monitoring) Color.White else BgDeep,
+                        tint = if (monitoring) Color.White else bg.deep,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -971,7 +987,7 @@ private fun FloatingControlBar(
 
 // ─── Overlay permission banner ────────────────────────────────────
 @Composable
-private fun OverlayPermissionBanner(onClick: () -> Unit) {
+private fun OverlayPermissionBanner(bg = bg, bg: FpsBgColors, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
