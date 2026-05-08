@@ -150,7 +150,7 @@ fun GlowLiquidNavBar(
     }
 
     Box(modifier = Modifier.width(navBarWidth).height(barHeight), contentAlignment = Alignment.Center) {
-        Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(Color(0xCC1A1A1A)))
+        Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)))
         
 
         if (itemWidthPx.value > 0f) {

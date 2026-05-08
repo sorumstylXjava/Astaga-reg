@@ -76,7 +76,7 @@ data class FpsSession(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FpsStatsScreen(navController: NavController) {
+fun FpsStatsScreen(navController: NavController, isPremium: Boolean = false) {
     val context = LocalContext.current
     val bg      = rememberFpsBgColors()
 
@@ -237,7 +237,7 @@ fun FpsStatsScreen(navController: NavController) {
                     .padding(padding),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                FloatingControlBar(bg = bg, 
+                FloatingControlBar(bg = bg, isPremium = isPremium,
                     isMonitoring = uiState.isMonitoring,
                     currentPkg   = uiState.targetPackage,
                     sessions     = sessions,
@@ -859,7 +859,7 @@ private fun SessionCard(bg: FpsBgColors, session: FpsSession, onDelete: () -> Un
 
 // ─── Floating control bar ─────────────────────────────────────────
 @Composable
-private fun FloatingControlBar(bg: FpsBgColors, 
+private fun FloatingControlBar(bg: FpsBgColors, isPremium: Boolean,
     isMonitoring: Boolean,
     currentPkg  : String,
     sessions    : List<FpsSession>,
@@ -875,7 +875,8 @@ private fun FloatingControlBar(bg: FpsBgColors,
 
     Box(
         modifier = Modifier
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp)
+            .padding(top = 16.dp, bottom = if (isPremium) 16.dp else 66.dp)
             .fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
