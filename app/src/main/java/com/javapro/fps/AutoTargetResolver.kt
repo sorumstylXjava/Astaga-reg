@@ -4,23 +4,11 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * AutoTargetResolver — terus resolve foreground app + surface setiap polling cycle.
- *
- * Mirip FloatMonitorFPS.e (dynamic target field) di Scene:
- * - Detect foreground app via dumpsys window
- * - Resolve surface name via SurfaceFlinger --list
- * - Cache hasil per package
- * - Return dynamic target setiap poll
- *
- * Consumer (FpsMonitorManager) inject target ini ke FpsEngine setiap tick.
- */
 class AutoTargetResolver(private val executor: ShellExecutor) {
 
     companion object {
         private const val TAG = "FpsResolver"
 
-        // Package yang dilewati (system UI, launcher, dsb)
         private val SKIP_PACKAGES = setOf(
             "com.android.systemui",
             "com.android.launcher",
@@ -37,16 +25,11 @@ class AutoTargetResolver(private val executor: ShellExecutor) {
         )
     }
 
-    // Dynamic target — diupdate setiap resolve
+   
     @Volatile var currentTarget: ResolvedTarget = ResolvedTarget.empty()
 
-    // Cache: pkg → surface candidates
     private val surfaceCache = mutableMapOf<String, List<String>>()
 
-    /**
-     * Resolve target terbaru. Dipanggil setiap polling cycle.
-     * Return cached target jika resolve gagal.
-     */
     suspend fun resolve(): ResolvedTarget = withContext(Dispatchers.IO) {
         val pkg = resolveFocusedPackage()
 
@@ -61,7 +44,6 @@ class AutoTargetResolver(private val executor: ShellExecutor) {
                 ?: ResolvedTarget.empty()
         }
 
-        // Jika package sama dengan sebelumnya, refresh surface saja tiap 10 resolve
         val surfaces = if (pkg == currentTarget.pkg && surfaceCache.containsKey(pkg)) {
             surfaceCache[pkg]!!
         } else {
@@ -77,11 +59,9 @@ class AutoTargetResolver(private val executor: ShellExecutor) {
 
     // ── Focused package ──────────────────────────────────────────
     private suspend fun resolveFocusedPackage(): String? {
-        // Method 1: dumpsys window mCurrentFocus
         val fromWindow = resolveFocusedFromWindow()
         if (fromWindow != null) return fromWindow
 
-        // Method 2: dumpsys activity top-resumed-activity
         val fromActivity = resolveFocusedFromActivity()
         if (fromActivity != null) return fromActivity
 
@@ -92,7 +72,6 @@ class AutoTargetResolver(private val executor: ShellExecutor) {
     private suspend fun resolveFocusedFromWindow(): String? {
         val raw = executor.run("dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp'")
             ?: return null
-        // Format: mCurrentFocus=Window{... u0 com.example.app/Activity}
         val pkg = Regex("""u\d\s+([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+)/""")
             .find(raw)?.groupValues?.get(1)
         Log.d(TAG, "focusedWindow: pkg=$pkg")
@@ -101,7 +80,7 @@ class AutoTargetResolver(private val executor: ShellExecutor) {
 
     private suspend fun resolveFocusedFromActivity(): String? {
         val raw = executor.run("dumpsys activity top-resumed-activity") ?: return null
-        // Format: "packageName=com.example.app"
+
         val pkg = Regex("""packageName=([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+)""")
             .find(raw)?.groupValues?.get(1)
             ?: Regex("""([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)+)/[A-Z]""")
@@ -158,11 +137,6 @@ class AutoTargetResolver(private val executor: ShellExecutor) {
     }
 }
 
-/**
- * ResolvedTarget — hasil resolve per cycle.
- * pkg: package foreground app saat ini
- * surfaces: daftar candidate surface name untuk SurfaceFlinger
- */
 data class ResolvedTarget(
     val pkg     : String,
     val surfaces: List<String>

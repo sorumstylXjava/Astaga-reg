@@ -10,7 +10,12 @@ class FpsRepository(
 
     fun observeFps(targetPackage: String, intervalMs: Long = 500L): Flow<FpsUiState> = flow {
         while (true) {
-            val state = monitor.poll(targetPackage, refreshRateHz)
+            // Buat ResolvedTarget dari package string — backward compat
+            val target = ResolvedTarget(
+                pkg      = targetPackage,
+                surfaces = listOf(targetPackage, "$targetPackage/", "$targetPackage#0", "")
+            )
+            val state = monitor.poll(target, refreshRateHz)
             emit(state)
             kotlinx.coroutines.delay(intervalMs)
         }
