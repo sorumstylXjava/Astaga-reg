@@ -10,19 +10,16 @@ class TweakShellExecutor(private val context: Context) : ShellExecutor {
 
     companion object {
         private const val TAG = "FpsShell"
-        // Set true untuk log tiap perintah shell — matikan di production
-        private const val VERBOSE = false
     }
 
     override suspend fun run(cmd: String): String? = withContext(Dispatchers.IO) {
         try {
+            // CRITICAL: pakai executeWithOutput yang sudah handle su/shizuku
+            // Tapi harus pastikan pipe/grep bisa jalan via sh -c
             val result = TweakExecutor.executeWithOutput(cmd)
-            if (VERBOSE) {
-                Log.v(TAG, "CMD: $cmd → ${result.length} chars")
-            }
-            result.ifEmpty { null }
+            if (result.isEmpty()) null else result
         } catch (e: Exception) {
-            Log.w(TAG, "EXCEPTION_STACKTRACE: cmd='$cmd' error=${e.message}")
+            Log.w(TAG, "EXCEPTION: cmd='${cmd.take(60)}' err=${e.message}")
             null
         }
     }

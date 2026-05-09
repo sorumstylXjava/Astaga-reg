@@ -12,12 +12,7 @@ private data class BackendMeta(
     var lastFrameTs     : Long = 0L
 ) {
     val isBlacklisted: Boolean get() = System.currentTimeMillis() < blacklistedUntil
-
-    fun blacklist(ms: Long = 20_000L) {
-        blacklistedUntil = System.currentTimeMillis() + ms
-        failCount        = 0
-        successCount     = 0
-    }
+    fun blacklist(ms: Long = 20_000L) { blacklistedUntil = System.currentTimeMillis() + ms; failCount = 0; successCount = 0 }
     fun onSuccess() { successCount++; failCount = 0 }
     fun onFail()    { failCount++ }
 }
@@ -25,17 +20,16 @@ private data class BackendMeta(
 class FpsEngine(private val executor: ShellExecutor) {
 
     companion object {
-        private const val TAG              = "FpsEngine"
-        private const val TAG_BACKEND      = "FpsBackend"
-        private const val TAG_FALLBACK     = "FpsFallback"
-        private const val TAG_PARSER       = "FpsParser"
-        private const val SWITCH_COOLDOWN  = 3_000L
-        private const val STALE_MS         = 2_500L
-        private const val MAX_FAIL         = 4
-        private const val BLACKLIST_MS     = 20_000L
-        private const val HISTORY          = 512
-        private const val MAX_FPS          = 300f
-        private const val SURFACE_REFRESH  = 10       // re-resolve surface tiap N tick
+        private const val TAG          = "FpsEngine"
+        private const val TAG_BACKEND  = "FpsBackend"
+        private const val TAG_FALLBACK = "FpsFallback"
+        private const val TAG_PARSER   = "FpsParser"
+        private const val SWITCH_COOLDOWN = 3_000L
+        private const val STALE_MS        = 2_500L
+        private const val MAX_FAIL        = 4
+        private const val BLACKLIST_MS    = 20_000L
+        private const val HISTORY         = 512
+        private const val MAX_FPS         = 300f
     }
 
     private val PRIORITY = listOf(
@@ -47,8 +41,7 @@ class FpsEngine(private val executor: ShellExecutor) {
         FpsBackend.GFXINFO_DRAW_PROCESS
     )
 
-    private val metas        = PRIORITY.associateWith { BackendMeta(it) }.toMutableMap()
-    private val surfaceResolver = FpsSurfaceResolver(executor)
+    private val metas = PRIORITY.associateWith { BackendMeta(it) }.toMutableMap()
 
     private var activeBackend     = FpsBackend.NONE
     private var lastSwitchMs      = 0L
@@ -57,38 +50,38 @@ class FpsEngine(private val executor: ShellExecutor) {
     private var lastTotalFrames   = -1
     private var lastTotalFramesMs = 0L
     private var cachedSurfaces    = emptyList<String>()
-    private var surfaceTickCount  = 0
     private var tickCount         = 0
+
+    // CRITICAL: track current pkg — reset engine jika pkg berubah
+    private var lastPkg = ""
 
     private val frameHistory = RingBuffer<FrameSample>(HISTORY)
 
-    /**
-     * poll() sekarang terima ResolvedTarget dari AutoTargetResolver.
-     * Target diupdate setiap cycle oleh resolver loop — tidak static.
-     *
-     * Jika target berubah (pkg berbeda), reset engine agar backend re-probe.
-     */
     suspend fun poll(target: ResolvedTarget, refreshHz: Float): EngineResult =
         withContext(Dispatchers.IO) {
             val pkg = target.pkg
             tickCount++
 
-            // ── Inject surfaces langsung dari resolver (tidak perlu re-resolve internal) ──
+            // ── CRITICAL: Reset engine jika pkg berubah ───────────
+            if (pkg != lastPkg && lastPkg.isNotEmpty()) {
+                Log.w(TAG, "pkg changed: $lastPkg → $pkg — resetting engine")
+                resetInternal()
+            }
+            lastPkg = pkg
+
+            // ── Update cached surfaces dari resolver ──────────────
             if (target.surfaces.isNotEmpty()) {
                 cachedSurfaces = target.surfaces
-            } else if (cachedSurfaces.isEmpty() || tickCount % SURFACE_REFRESH == 0) {
-                cachedSurfaces = surfaceResolver.resolveSurfaces(pkg)
             }
-            Log.d(TAG, "poll: tick=$tickCount pkg=$pkg surfaces=${cachedSurfaces.firstOrNull()}")
 
-            // ── Select backend jika belum ada ─────────────────────────
+            // ── Select backend jika belum ada ─────────────────────
             if (activeBackend == FpsBackend.NONE) {
                 selectBackend(pkg)
             }
 
-            // ── Fetch frames ──────────────────────────────────────────
+            // ── Fetch frames ──────────────────────────────────────
             val frames = try {
-                fetchFrames(pkg, refreshHz)
+                fetchFrames(pkg)
             } catch (e: Exception) {
                 Log.e(TAG, "EXCEPTION_STACKTRACE: fetchFrames $activeBackend", e)
                 emptyList()
@@ -98,8 +91,8 @@ class FpsEngine(private val executor: ShellExecutor) {
 
             if (frames.isEmpty()) {
                 meta.onFail()
-                failReason = "empty frames: $activeBackend fail=${meta.failCount}"
-                Log.w(TAG_FALLBACK, "from=$activeBackend reason=empty_frames fail=${meta.failCount}")
+                failReason = "empty: $activeBackend fail=${meta.failCount}"
+                Log.w(TAG_FALLBACK, "from=$activeBackend reason=empty fail=${meta.failCount}")
                 if (meta.failCount >= MAX_FAIL) {
                     meta.blacklist(BLACKLIST_MS)
                     Log.w(TAG_FALLBACK, "blacklisted $activeBackend for ${BLACKLIST_MS/1000}s")
@@ -107,15 +100,12 @@ class FpsEngine(private val executor: ShellExecutor) {
                 }
             } else {
                 val latestTs = frames.lastOrNull()?.timestamp ?: 0L
-                val nowMs    = System.currentTimeMillis()
-
-                // Stale check
                 if (latestTs > 0 && latestTs == meta.lastFrameTs) {
-                    val staleMs = nowMs - lastSwitchMs
+                    val staleMs = System.currentTimeMillis() - lastSwitchMs
                     if (staleMs > STALE_MS) {
                         meta.onFail()
-                        failReason = "stale: $activeBackend ts unchanged for ${staleMs}ms"
-                        Log.w(TAG_FALLBACK, "from=$activeBackend reason=stale age=${staleMs}ms")
+                        failReason = "stale: $activeBackend age=${staleMs}ms"
+                        Log.w(TAG_FALLBACK, failReason)
                         if (meta.failCount >= MAX_FAIL) {
                             meta.blacklist(BLACKLIST_MS)
                             switchBackend(pkg)
@@ -133,9 +123,8 @@ class FpsEngine(private val executor: ShellExecutor) {
             val allFrames = frameHistory.toList()
             val fps       = if (allFrames.size >= 2) FpsCalculator.calculate(allFrames, refreshHz) else FpsStats()
 
-            Log.d(TAG_BACKEND, "backend=${activeBackend} fps=${fps.currentFps} valid=${fps.currentFps > 0f}")
+            Log.d(TAG_BACKEND, "backend=$activeBackend fps=${fps.currentFps} valid=${fps.currentFps > 0f}")
 
-            // Update session cache
             FpsSessionCache.lastBackend = activeBackend
             if (fps.currentFps > 0f) FpsSessionCache.lastGoodFps = fps.currentFps
 
@@ -151,16 +140,12 @@ class FpsEngine(private val executor: ShellExecutor) {
 
     // ── Backend selection ─────────────────────────────────────────
     private suspend fun selectBackend(pkg: String) {
-        Log.d(TAG_BACKEND, "selectBackend: pkg=$pkg scanning...")
+        Log.d(TAG_BACKEND, "selectBackend: pkg=$pkg")
         for (backend in PRIORITY) {
             val meta = metas[backend]!!
-            if (meta.isBlacklisted) {
-                Log.d(TAG_BACKEND, "skip $backend — blacklisted")
-                continue
-            }
+            if (meta.isBlacklisted) { Log.d(TAG_BACKEND, "skip $backend — blacklisted"); continue }
             val ok = try { probeBackend(backend, pkg) } catch (e: Exception) {
-                Log.e(TAG_BACKEND, "probe exception $backend", e)
-                false
+                Log.e(TAG_BACKEND, "probe exception $backend", e); false
             }
             if (ok) {
                 activeBackend = backend
@@ -169,26 +154,26 @@ class FpsEngine(private val executor: ShellExecutor) {
                 return
             }
         }
+        // Last resort — GFXINFO_TOTALFRAMES hampir selalu ada
         activeBackend = FpsBackend.GFXINFO_TOTALFRAMES
         lastSwitchMs  = System.currentTimeMillis()
-        failReason    = "no ideal backend, fallback to GFXINFO_TOTALFRAMES"
-        Log.w(TAG_BACKEND, "backend=GFXINFO_TOTALFRAMES (last resort)")
+        failReason    = "no ideal backend, using GFXINFO_TOTALFRAMES"
+        Log.w(TAG_BACKEND, failReason)
     }
 
     private suspend fun switchBackend(pkg: String) {
         val now = System.currentTimeMillis()
         if (now - lastSwitchMs < SWITCH_COOLDOWN) {
-            Log.d(TAG_FALLBACK, "switchBackend: cooldown active, skip (${ now - lastSwitchMs}ms < $SWITCH_COOLDOWN ms)")
+            Log.d(TAG_FALLBACK, "switchBackend: cooldown ${now - lastSwitchMs}ms < ${SWITCH_COOLDOWN}ms, skip")
             return
         }
         val prev = activeBackend
-        Log.w(TAG_FALLBACK, "switchBackend: from=$prev triggering re-select")
         activeBackend     = FpsBackend.NONE
         frameHistory.clear()
         lastTotalFrames   = -1
         lastTotalFramesMs = 0L
         selectBackend(pkg)
-        Log.w(TAG_FALLBACK, "switchBackend: to=$activeBackend")
+        Log.w(TAG_FALLBACK, "switchBackend: $prev → $activeBackend")
     }
 
     private suspend fun probeBackend(backend: FpsBackend, pkg: String): Boolean {
@@ -198,9 +183,7 @@ class FpsEngine(private val executor: ShellExecutor) {
                 measuredFpsPaths().any { path ->
                     val raw = executor.run("cat $path") ?: return@any false
                     val fps = raw.trim().toFloatOrNull() ?: return@any false
-                    (fps > 0f && fps < MAX_FPS).also {
-                        Log.d(TAG_BACKEND, "probe SYSFS $path fps=$fps valid=$it")
-                    }
+                    (fps > 0f && fps < MAX_FPS).also { Log.d(TAG_BACKEND, "probe SYSFS $path fps=$fps valid=$it") }
                 }
             }
             FpsBackend.FPSGO -> {
@@ -222,9 +205,8 @@ class FpsEngine(private val executor: ShellExecutor) {
                               else "dumpsys SurfaceFlinger --latency \"$surface\""
                     val raw = executor.run(cmd) ?: return@any false
                     lastShellOutput = raw.take(300)
-                    SurfaceFlingerParser.isValid(raw).also {
-                        Log.d(TAG_BACKEND, "probe SF_LATENCY surface='$surface' valid=$it raw_len=${raw.length}")
-                    }
+                    SurfaceFlingerParser.isValid(raw)
+                        .also { Log.d(TAG_BACKEND, "probe SF_LATENCY surface='$surface' valid=$it len=${raw.length}") }
                 }
             }
             FpsBackend.GFXINFO_TOTALFRAMES -> {
@@ -244,12 +226,11 @@ class FpsEngine(private val executor: ShellExecutor) {
     }
 
     // ── Fetch frames ───────────────────────────────────────────────
-    private suspend fun fetchFrames(pkg: String, refreshHz: Float): List<FrameSample> {
+    private suspend fun fetchFrames(pkg: String): List<FrameSample> {
         return when (activeBackend) {
             FpsBackend.SYSFS_MEASURED_FPS -> {
                 for (path in measuredFpsPaths()) {
-                    val raw = executor.run("cat $path")?.trim() ?: continue
-                    val fps = raw.toFloatOrNull() ?: continue
+                    val fps = executor.run("cat $path")?.trim()?.toFloatOrNull() ?: continue
                     if (fps <= 0f || fps >= MAX_FPS) continue
                     lastShellOutput = "$path=$fps"
                     Log.d(TAG_PARSER, "SYSFS fps=$fps path=$path")
@@ -264,7 +245,7 @@ class FpsEngine(private val executor: ShellExecutor) {
                     val fps = Regex("""fps[=:\s]+(\d+\.?\d*)""", RegexOption.IGNORE_CASE)
                         .find(raw)?.groupValues?.get(1)?.toFloatOrNull() ?: continue
                     if (fps <= 0f || fps >= MAX_FPS) continue
-                    Log.d(TAG_PARSER, "FPSGO fps=$fps path=$path")
+                    Log.d(TAG_PARSER, "FPSGO fps=$fps")
                     return syntheticFromFps(fps)
                 }
                 emptyList()
@@ -332,16 +313,12 @@ class FpsEngine(private val executor: ShellExecutor) {
     private fun syntheticFromFps(fps: Float): List<FrameSample> {
         val ft  = 1000f / fps
         val now = System.nanoTime()
-        return listOf(
-            FrameSample(now - (ft * 1_000_000L).toLong(), ft),
-            FrameSample(now, ft)
-        )
+        return listOf(FrameSample(now - (ft * 1_000_000L).toLong(), ft), FrameSample(now, ft))
     }
 
     private fun isValidSample(s: FrameSample): Boolean {
         if (s.frameTimeMs.isNaN() || s.frameTimeMs <= 0f || s.frameTimeMs > 1000f) return false
-        val fps = 1000f / s.frameTimeMs
-        return fps > 0f && fps <= MAX_FPS
+        return 1000f / s.frameTimeMs in 1f..MAX_FPS
     }
 
     private fun measuredFpsPaths() = listOf(
@@ -357,8 +334,8 @@ class FpsEngine(private val executor: ShellExecutor) {
         "/proc/fpsgo/fstb/fpsgo_status"
     )
 
-    fun reset() {
-        Log.d(TAG, "FpsEngine.reset()")
+    // Reset state internal tanpa touch metas blacklist
+    private fun resetInternal() {
         activeBackend     = FpsBackend.NONE
         lastSwitchMs      = 0L
         failReason        = ""
@@ -366,15 +343,18 @@ class FpsEngine(private val executor: ShellExecutor) {
         lastTotalFrames   = -1
         lastTotalFramesMs = 0L
         cachedSurfaces    = emptyList()
-        surfaceTickCount  = 0
         tickCount         = 0
         frameHistory.clear()
-        metas.values.forEach {
-            it.failCount       = 0
-            it.successCount    = 0
-            it.blacklistedUntil = 0L
-            it.lastFrameTs     = 0L
-        }
+        // Reset fail/success tapi pertahankan blacklist agar tidak probe ulang backend yang sudah jelas gagal
+        metas.values.forEach { it.failCount = 0; it.successCount = 0; it.lastFrameTs = 0L }
+    }
+
+    fun reset() {
+        Log.d(TAG, "FpsEngine.reset()")
+        lastPkg = ""
+        resetInternal()
+        // Full reset — hapus juga blacklist
+        metas.values.forEach { it.blacklistedUntil = 0L }
     }
 }
 
