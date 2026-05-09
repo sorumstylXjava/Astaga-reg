@@ -62,15 +62,24 @@ class FpsEngine(private val executor: ShellExecutor) {
 
     private val frameHistory = RingBuffer<FrameSample>(HISTORY)
 
-    suspend fun poll(pkg: String, refreshHz: Float): EngineResult =
+    /**
+     * poll() sekarang terima ResolvedTarget dari AutoTargetResolver.
+     * Target diupdate setiap cycle oleh resolver loop — tidak static.
+     *
+     * Jika target berubah (pkg berbeda), reset engine agar backend re-probe.
+     */
+    suspend fun poll(target: ResolvedTarget, refreshHz: Float): EngineResult =
         withContext(Dispatchers.IO) {
+            val pkg = target.pkg
             tickCount++
 
-            // ── Re-resolve surfaces tiap SURFACE_REFRESH tick ────────
-            if (cachedSurfaces.isEmpty() || tickCount % SURFACE_REFRESH == 0) {
+            // ── Inject surfaces langsung dari resolver (tidak perlu re-resolve internal) ──
+            if (target.surfaces.isNotEmpty()) {
+                cachedSurfaces = target.surfaces
+            } else if (cachedSurfaces.isEmpty() || tickCount % SURFACE_REFRESH == 0) {
                 cachedSurfaces = surfaceResolver.resolveSurfaces(pkg)
-                Log.d(TAG, "surface candidates for $pkg: $cachedSurfaces")
             }
+            Log.d(TAG, "poll: tick=$tickCount pkg=$pkg surfaces=${cachedSurfaces.firstOrNull()}")
 
             // ── Select backend jika belum ada ─────────────────────────
             if (activeBackend == FpsBackend.NONE) {

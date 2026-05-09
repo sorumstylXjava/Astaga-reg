@@ -97,37 +97,11 @@ fun FpsStatsScreen(navController: NavController) {
     val vm: FpsStatsViewModel = viewModel(factory = factory)
     val uiState by vm.uiState.collectAsState()
 
-    var sessions        by remember { mutableStateOf<List<FpsSession>>(emptyList()) }
-    var showDebug       by remember { mutableStateOf(false) }
-    var showPkgDialog   by remember { mutableStateOf(false) }
-    var pkgInput        by remember { mutableStateOf("") }
-    val canOverlay      = remember { Settings.canDrawOverlays(context) }
+    var sessions   by remember { mutableStateOf<List<FpsSession>>(emptyList()) }
+    var showDebug  by remember { mutableStateOf(false) }
+    val canOverlay = remember { Settings.canDrawOverlays(context) }
 
-    // TIDAK ada DisposableEffect { stopMonitoring() } — monitor hidup di singleton Manager
-    // Screen hanya observer, bukan owner lifecycle monitor
-
-    if (showPkgDialog) {
-        PackageInputDialog(bg = bg, 
-            current   = pkgInput,
-            onConfirm = { pkg ->
-                pkgInput      = pkg
-                showPkgDialog = false
-                if (pkg.isNotBlank()) {
-                    // 1. Start monitoring via singleton Manager
-                    vm.startMonitoring(context, pkg)
-                    // 2. Start foreground service agar survive background/game
-                    val intent = Intent(context, FpsService::class.java).apply {
-                        putExtra(FpsService.EXTRA_PACKAGE, pkg)
-                        putExtra(FpsService.EXTRA_SHOW_OVERLAY, canOverlay)
-                    }
-                    context.startForegroundService(intent)
-                    // 3. Show overlay langsung (jika permission granted)
-                    if (canOverlay) vm.showOverlay(context)
-                }
-            },
-            onDismiss = { showPkgDialog = false }
-        )
-    }
+    // Tidak ada PackageInputDialog — target dideteksi otomatis oleh AutoTargetResolver
 
     Box(
         modifier = Modifier
@@ -255,11 +229,20 @@ fun FpsStatsScreen(navController: NavController) {
                     onClearAll   = { sessions = emptyList() },
                     onRecord     = {
                         if (uiState.isMonitoring) {
+                            // STOP
                             vm.stopMonitoring()
                             vm.hideOverlay()
                             context.stopService(Intent(context, FpsService::class.java))
                         } else {
-                            showPkgDialog = true
+                            // START — auto target, tidak perlu package input
+                            vm.startMonitoring(context)
+                            // Start foreground service agar survive background
+                            val intent = Intent(context, FpsService::class.java).apply {
+                                putExtra(FpsService.EXTRA_SHOW_OVERLAY, canOverlay)
+                            }
+                            context.startForegroundService(intent)
+                            // Show overlay langsung
+                            if (canOverlay) vm.showOverlay(context)
                         }
                     },
                     onOverlay = {
@@ -271,74 +254,6 @@ fun FpsStatsScreen(navController: NavController) {
             }
         }
     }
-}
-
-// ─── Package input dialog (unchanged logic) ──────────────────────
-@Composable
-private fun PackageInputDialog(bg: FpsBgColors, 
-    current  : String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var text by remember { mutableStateOf(current) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor   = bg.card,
-        title = { Text("Target Package", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface) },
-        text  = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Masukkan package name aplikasi yang ingin dimonitor FPS-nya.",
-                    fontSize = 13.sp,
-                    color    = MaterialTheme.colorScheme.onSurface.copy(0.55f)
-                )
-                OutlinedTextField(
-                    value         = text,
-                    onValueChange = { text = it },
-                    placeholder   = { Text("com.example.game", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.3f)) },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = clrCyan,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(0.15f),
-                        focusedTextColor     = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor   = MaterialTheme.colorScheme.onSurface.copy(0.8f),
-                        cursorColor          = clrCyan
-                    )
-                )
-                Text("Quick:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.35f))
-                listOf(
-                    "com.miHoYo.GenshinImpact",
-                    "com.pubg.imobile",
-                    "com.mobile.legends",
-                    "com.riotgames.league.wildrift"
-                ).forEach { pkg ->
-                    TextButton(
-                        onClick  = { text = pkg },
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(pkg, fontSize = 11.sp, textAlign = TextAlign.Start,
-                            color = clrCyan.copy(0.8f),
-                            modifier = Modifier.fillMaxWidth())
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(text.trim()) },
-                colors  = ButtonDefaults.buttonColors(containerColor = clrCyan)
-            ) {
-                Text("Start Monitor", color = bg.deep, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Batal", color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
-            }
-        }
-    )
 }
 
 // ─── Device info compact chips ────────────────────────────────────

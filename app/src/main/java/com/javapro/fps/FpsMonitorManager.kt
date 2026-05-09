@@ -95,60 +95,80 @@ object FpsMonitorManager : LifecycleOwner, SavedStateRegistryOwner {
     private var overlayView  : ComposeView?   = null
     private var overlayStateFlow = MutableStateFlow(FpsUiState())
 
-    private var monitor: FpsMonitor? = null
+    private var monitor : FpsMonitor?          = null
+    private var resolver: AutoTargetResolver?  = null
 
-    // ── Start monitoring ──────────────────────────────────────────
-    fun startMonitoring(context: Context, targetPackage: String) {
-        Log.d(TAG, "startMonitoring: pkg='$targetPackage' isRunning=$isMonitoring " +
-            "currentPkg='${FpsSessionCache.currentPackage}'")
+    // ── Start monitoring — AUTO TARGET, tidak perlu package manual ─
+    fun startMonitoring(context: Context) {
+        Log.d(TAG, "startMonitoring: isRunning=$isMonitoring")
 
-        // Guard: same package already running
-        if (pollJob?.isActive == true && FpsSessionCache.currentPackage == targetPackage) {
-            Log.d(TAG, "startMonitoring: already running same pkg, skip")
+        if (pollJob?.isActive == true) {
+            Log.d(TAG, "startMonitoring: already running, skip")
             return
         }
 
-        // Different pkg — cancel old
-        if (pollJob?.isActive == true) {
-            Log.d(TAG, "startMonitoring: switching from ${FpsSessionCache.currentPackage} to $targetPackage")
-            pollJob?.cancel()
-        }
+        FpsSessionCache.monitorRunning = true
 
-        FpsSessionCache.currentPackage = targetPackage
-        FpsSessionCache.monitorRunning  = true
-
-        val hz = RefreshRateDetector.detect(context)
+        val hz   = RefreshRateDetector.detect(context)
         val exec = TweakShellExecutor(context)
         val mon  = FpsMonitor(exec)
+        val res  = AutoTargetResolver(exec)
         mon.reset()
-        monitor = mon
+        res.clearCache()
+        monitor  = mon
+        resolver = res
 
         _uiState.value = FpsUiState(
             isMonitoring  = true,
-            targetPackage = targetPackage,
+            targetPackage = "auto-detecting…",
             refreshRateHz = hz,
             debug = DebugInfo(
-                targetPackage = targetPackage,
+                targetPackage = "auto-detecting…",
                 activeBackend = FpsBackend.NONE,
                 overlayStatus = overlayStatus
             )
         )
-        Log.d(TAG, "startMonitoring: state set isMonitoring=true hz=$hz")
+        Log.d(TAG, "startMonitoring: launching auto-resolver + poll loop hz=$hz")
 
         pollJob = scope.launch {
-            Log.d(TAG, "MONITOR_TICK: coroutine started pkg=$targetPackage")
+            Log.d(TAG, "MONITOR_TICK: coroutine started (auto-target mode)")
             var tick = 0
             while (isActive) {
                 try {
-                    val state = mon.poll(targetPackage, hz)
-                    _uiState.value        = state
-                    overlayStateFlow.value = state
-                    FpsSessionCache.updateFromState(state)
+                    // ── Step 1: Resolve foreground target setiap tick ──
+                    val target = res.resolve()
+
+                    if (!target.isValid()) {
+                        Log.d(TAG, "MONITOR_TICK: #$tick target invalid/empty, skip poll")
+                        delay(POLL_MS)
+                        continue
+                    }
+
+                    // ── Step 2: Poll FPS dengan target terkini ─────────
+                    val state = mon.poll(target, hz)
+
+                    // Inject target info ke state
+                    val stateWithTarget = state.copy(
+                        targetPackage = target.pkg,
+                        debug = state.debug.copy(
+                            targetPackage = target.pkg,
+                            overlayStatus = overlayStatus
+                        )
+                    )
+
+                    _uiState.value         = stateWithTarget
+                    overlayStateFlow.value = stateWithTarget
+                    FpsSessionCache.updateFromState(stateWithTarget)
+                    FpsSessionCache.currentPackage = target.pkg
+
                     tick++
                     if (tick == 1 || tick % 10 == 0) {
-                        Log.d(TAG, "MONITOR_TICK: #$tick fps=${state.fps.currentFps} " +
-                            "backend=${state.activeBackend} frames=${state.debug.parsedFrameCount} " +
-                            "fail='${state.debug.backendFailReason}'")
+                        Log.d(TAG, "MONITOR_TICK: #$tick " +
+                            "target=${target.pkg} " +
+                            "surface=${target.primarySurface()} " +
+                            "fps=${state.fps.currentFps} " +
+                            "backend=${state.activeBackend} " +
+                            "frames=${state.debug.parsedFrameCount}")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "EXCEPTION_STACKTRACE: poll tick=$tick", e)
@@ -167,14 +187,24 @@ object FpsMonitorManager : LifecycleOwner, SavedStateRegistryOwner {
         Log.d(TAG, "startMonitoring: pollJob launched active=${pollJob?.isActive}")
     }
 
+    // ── Overload untuk backward compat — ignored targetPackage, langsung auto ─
+    fun startMonitoring(context: Context, @Suppress("UNUSED_PARAMETER") targetPackage: String) {
+        Log.d(TAG, "startMonitoring(pkg): legacy call, redirecting to auto-target mode")
+        startMonitoring(context)
+    }
+
     fun stopMonitoring() {
         Log.d(TAG, "stopMonitoring: called isRunning=$isMonitoring")
         pollJob?.cancel()
         pollJob = null
         monitor?.reset()
         monitor = null
+        resolver?.clearCache()
+        resolver = null
         FpsSessionCache.monitorRunning = false
+        FpsSessionCache.currentPackage = ""
         _uiState.value = FpsUiState(isMonitoring = false)
+        Log.d(TAG, "stopMonitoring: done")
     }
 
     // ── Overlay — WAJIB dipanggil dari Main thread ────────────────

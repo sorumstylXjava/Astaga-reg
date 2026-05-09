@@ -20,13 +20,14 @@ class FpsMonitor(private val executor: ShellExecutor) {
     private val gpuHistory       = RingBuffer<Float>(HISTORY_SIZE)
     private val tempHistory      = RingBuffer<Float>(HISTORY_SIZE)
 
-    suspend fun poll(pkg: String, refreshHz: Float): FpsUiState =
+    suspend fun poll(target: ResolvedTarget, refreshHz: Float): FpsUiState =
         withContext(Dispatchers.IO) {
+            val pkg = target.pkg
 
             val engineResult = try {
-                engine.poll(pkg, refreshHz)
+                engine.poll(target, refreshHz)
             } catch (e: Exception) {
-                Log.e(TAG, "EXCEPTION_STACKTRACE: engine.poll", e)
+                Log.e(TAG, "EXCEPTION_STACKTRACE: engine.poll pkg=$pkg", e)
                 EngineResult(emptyList(), FpsStats(), FpsBackend.NONE, "engine: ${e.message}", 0, "")
             }
 

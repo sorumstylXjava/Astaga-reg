@@ -32,9 +32,18 @@ class FpsStatsViewModel(private val context: Context) : ViewModel() {
         initialValue = FpsMonitorManager.reconnect()
     )
 
+    /**
+     * Start auto-target monitoring — tidak butuh package manual.
+     * AutoTargetResolver akan detect foreground app setiap polling cycle.
+     */
+    fun startMonitoring(context: Context) {
+        Log.d(TAG, "startMonitoring(auto) → Manager")
+        FpsMonitorManager.startMonitoring(context)
+    }
+
     fun startMonitoring(context: Context, pkg: String) {
-        Log.d(TAG, "startMonitoring → Manager pkg='$pkg'")
-        FpsMonitorManager.startMonitoring(context, pkg)
+        Log.d(TAG, "startMonitoring(pkg=$pkg) → Manager (auto-target)")
+        FpsMonitorManager.startMonitoring(context)  // pkg ignored — auto detect
     }
 
     fun stopMonitoring() {
