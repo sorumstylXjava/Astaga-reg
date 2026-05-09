@@ -1027,34 +1027,49 @@ private fun FpsMonitorCard(
         modifier = modifier
             .clip(RoundedCornerShape(32.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(0.22f)), RoundedCornerShape(32.dp))
-            .clickable { navController.navigate("fps_stats") }
+            .border(BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.5f)), RoundedCornerShape(32.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier         = Modifier
-                    .size(48.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(0.16f), RoundedCornerShape(14.dp))
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.3f)), RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp)) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier         = Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(0.06f), RoundedCornerShape(14.dp))
+                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.4f)), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f), modifier = Modifier.size(26.dp)) }
+
+                Surface(
+                    modifier = Modifier.align(Alignment.TopEnd),
+                    shape    = RoundedCornerShape(50),
+                    color    = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Text(
+                        text       = "Soon",
+                        fontSize   = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier   = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+            }
 
             Text(
                 stringResource(R.string.home_fps_monitor_title),
                 fontWeight = FontWeight.Bold,
                 fontSize   = 14.sp,
-                color      = MaterialTheme.colorScheme.onSurface
+                color      = MaterialTheme.colorScheme.onSurface.copy(0.45f)
             )
 
             Text(
                 stringResource(R.string.home_show_fps),
                 fontSize   = 11.sp,
-                color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                color      = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
                 lineHeight = 15.sp
             )
 
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.primary.copy(0.7f), modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outlineVariant.copy(0.5f), modifier = Modifier.size(18.dp))
             }
         }
     }

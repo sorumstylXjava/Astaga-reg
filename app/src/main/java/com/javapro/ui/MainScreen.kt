@@ -361,8 +361,6 @@ private fun NavContent(
         composable("debug_tools")   { DebugToolsScreen(navController = navController, prefManager = prefManager, lang = lang) }
         composable("screen_record") { ScreenRecordScreen(navController = navController, lang = lang) }
         composable("battery")       { BatteryScreen(navController = navController, lang = lang) }
-        composable("fps_stats")     { FpsStatsScreen(navController = navController) }
-
         // ── Daily Reward Screen ──────────────────────────────────────
         composable("daily_reward") {
             val activity = LocalContext.current.findActivity()
