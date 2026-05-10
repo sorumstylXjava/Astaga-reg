@@ -431,7 +431,7 @@ fun PremiumScreen(navController: NavController, lang: String) {
                         accentColor = Color(0xFFFF8F00),
                         buttonLabel = context.getString(R.string.action_buy),
                         enabled     = email.isNotEmpty(),
-                        onClick     = { pendingPkgType = "yearly";    pendingPkgAmount = 40000; pendingPkgLabel = "Plus★ (365 hari)"; showPaymentSheet = true }
+                        onClick     = { pendingPkgType = "yearly";    pendingPkgAmount = 50000; pendingPkgLabel = "Plus★ (365 hari)"; showPaymentSheet = true }
                     )
                     PremiumPackageCard(
                         modifier    = Modifier.weight(1f),
@@ -667,7 +667,7 @@ private fun PaymentMethodSheet(
     val amountUsd  = when (packageType) {
         "weekly"    -> "0.63"
         "monthly"   -> "1.25"
-        "yearly"    -> "2.67"
+        "yearly"    -> "3.13"
         "permanent" -> "4.67"
         else        -> "0.63"
     }
@@ -822,14 +822,14 @@ private fun openPayment(context: Context, email: String, packageType: String, pl
     val amountIdr = when (packageType) {
         "weekly"    -> 10000
         "monthly"   -> 20000
-        "yearly"    -> 40000
+        "yearly"    -> 50000
         "permanent" -> 80000
         else        -> 0
     }
     val amountUsd = when (packageType) {
         "weekly"    -> "0.63"
         "monthly"   -> "1.25"
-        "yearly"    -> "2.67"
+        "yearly"    -> "3.13"
         "permanent" -> "4.67"
         else        -> "0.63"
     }
