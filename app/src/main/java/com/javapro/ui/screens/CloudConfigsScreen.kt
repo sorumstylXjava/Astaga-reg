@@ -75,6 +75,35 @@ private fun incrementDownloadCount(context: Context) {
     prefs.edit().putString("dl_day", today).putInt("dl_count", current + 1).apply()
 }
 
+// ── Upload rate limit: 1x per 2 hari ────────────────────────────────────────
+// Simpan timestamp upload terakhir di SharedPrefs.
+// Cukup 1 field — tidak perlu counter karena limit-nya bukan per-hari tapi per-interval.
+private const val KEY_LAST_UPLOAD_MS = "last_upload_ms"
+
+private fun canUploadNow(context: Context): Boolean {
+    val prefs      = context.getSharedPreferences(PREF_CLOUD, Context.MODE_PRIVATE)
+    val lastUpload = prefs.getLong(KEY_LAST_UPLOAD_MS, 0L)
+    val elapsed    = System.currentTimeMillis() - lastUpload
+    val twoDaysMs  = 2L * 24 * 60 * 60 * 1000
+    return elapsed >= twoDaysMs
+}
+
+private fun saveUploadTimestamp(context: Context) {
+    context.getSharedPreferences(PREF_CLOUD, Context.MODE_PRIVATE)
+        .edit().putLong(KEY_LAST_UPLOAD_MS, System.currentTimeMillis()).apply()
+}
+
+/** Sisa waktu cooldown dalam format "Xj Ym" — untuk ditampilkan di UI */
+private fun uploadCooldownRemaining(context: Context): String {
+    val prefs      = context.getSharedPreferences(PREF_CLOUD, Context.MODE_PRIVATE)
+    val lastUpload = prefs.getLong(KEY_LAST_UPLOAD_MS, 0L)
+    val twoDaysMs  = 2L * 24 * 60 * 60 * 1000
+    val remainMs   = (lastUpload + twoDaysMs - System.currentTimeMillis()).coerceAtLeast(0L)
+    val hours      = remainMs / (1000 * 60 * 60)
+    val minutes    = (remainMs % (1000 * 60 * 60)) / (1000 * 60)
+    return "${hours}j ${minutes}m"
+}
+
 private fun hasLocalTweaks(context: Context): Boolean {
     val prefs = context.getSharedPreferences("GameBoostPrefs", Context.MODE_PRIVATE)
     return prefs.all.any { it.key.startsWith("boost_") && it.value == true }
@@ -112,6 +141,10 @@ fun CloudConfigsScreen(
     var todayCount        by remember { mutableStateOf(getTodayDownloadCount(context)) }
     var listenerReg       by remember { mutableStateOf<ListenerRegistration?>(null) }
     val hasLocal          = remember { hasLocalTweaks(context) }
+
+    // Upload rate limit state — dicek ulang tiap kali sheet dibuka
+    var canUpload    by remember { mutableStateOf(canUploadNow(context)) }
+    var cooldownText by remember { mutableStateOf(uploadCooldownRemaining(context)) }
 
     // State untuk double-ad gate (free user)
     var pendingConfig     by remember { mutableStateOf<CloudConfig?>(null) }
@@ -208,12 +241,21 @@ fun CloudConfigsScreen(
     }
 
     if (showUploadSheet) {
+        // Refresh cooldown state setiap kali sheet dibuka
+        LaunchedEffect(showUploadSheet) {
+            canUpload    = canUploadNow(context)
+            cooldownText = uploadCooldownRemaining(context)
+        }
         UploadConfigSheet(
-            packageName = packageName,
-            context     = context,
-            onDismiss   = { showUploadSheet = false },
-            onUploaded  = {
+            packageName  = packageName,
+            context      = context,
+            canUpload    = canUpload,
+            cooldownText = cooldownText,
+            onDismiss    = { showUploadSheet = false },
+            onUploaded   = {
                 showUploadSheet = false
+                canUpload       = false
+                cooldownText    = uploadCooldownRemaining(context)
                 Toast.makeText(context, context.getString(R.string.cloud_upload_success), Toast.LENGTH_SHORT).show()
             }
         )
@@ -662,10 +704,12 @@ private fun PremiumGateSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UploadConfigSheet(
-    packageName : String,
-    context     : Context,
-    onDismiss   : () -> Unit,
-    onUploaded  : () -> Unit
+    packageName  : String,
+    context      : Context,
+    canUpload    : Boolean,
+    cooldownText : String,
+    onDismiss    : () -> Unit,
+    onUploaded   : () -> Unit
 ) {
     val scope         = rememberCoroutineScope()
     var configName    by remember { mutableStateOf("") }
@@ -690,6 +734,41 @@ private fun UploadConfigSheet(
                 fontWeight = FontWeight.ExtraBold,
                 fontSize   = 18.sp
             )
+
+            // Banner cooldown — tampil kalau masih dalam jeda 2 hari
+            if (!canUpload) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(12.dp),
+                    color    = MaterialTheme.colorScheme.errorContainer.copy(0.5f)
+                ) {
+                    Row(
+                        modifier              = Modifier.padding(12.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.HourglassTop,
+                            null,
+                            tint     = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Column {
+                            Text(
+                                "Upload dibatasi 1x per 2 hari",
+                                fontSize   = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color      = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                "Tersedia lagi dalam: $cooldownText",
+                                fontSize = 11.sp,
+                                color    = MaterialTheme.colorScheme.onErrorContainer.copy(0.75f)
+                            )
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value         = configName,
@@ -718,7 +797,7 @@ private fun UploadConfigSheet(
 
             Button(
                 onClick  = {
-                    if (configName.isBlank()) return@Button
+                    if (configName.isBlank() || !canUpload) return@Button
                     scope.launch {
                         isUploading = true
                         withContext(Dispatchers.IO) {
@@ -747,13 +826,15 @@ private fun UploadConfigSheet(
                                     .collection(FIRESTORE_PATH)
                                     .add(data)
                                     .await()
+                                // Simpan timestamp upload berhasil → aktifkan cooldown 2 hari
+                                saveUploadTimestamp(context)
                             } catch (_: Exception) {}
                         }
                         isUploading = false
                         onUploaded()
                     }
                 },
-                enabled  = configName.isNotBlank() && !isUploading,
+                enabled  = configName.isNotBlank() && !isUploading && canUpload,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -765,6 +846,10 @@ private fun UploadConfigSheet(
                         strokeWidth = 2.dp,
                         color       = MaterialTheme.colorScheme.onPrimary
                     )
+                } else if (!canUpload) {
+                    Icon(Icons.Default.HourglassTop, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Cooldown: $cooldownText", fontWeight = FontWeight.Bold)
                 } else {
                     Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
