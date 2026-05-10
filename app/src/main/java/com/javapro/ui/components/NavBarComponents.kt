@@ -16,6 +16,7 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalConfiguration
@@ -129,9 +131,6 @@ fun GlowLiquidNavBar(
     val navBarWidth   = configuration.screenWidthDp.dp * 0.85f
     val barHeight     = 58.dp
     val pillPadding   = 4.dp
-    val navBgBase     = Color.Transparent
-    val glassTop      = Color.Transparent
-    val glassBot      = Color.Transparent
 
     val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val itemWidthPx   = remember { mutableStateOf(0f) }
@@ -149,8 +148,33 @@ fun GlowLiquidNavBar(
         (itemWidthPx.value - with(density) { (pillPadding * 2).toPx() }).toDp()
     }
 
+    // Background adaptif: lebih solid di mode terang agar tidak hilang
+    val navBg     = MaterialTheme.colorScheme.surfaceContainer
+    val isDark    = MaterialTheme.colorScheme.surface.luminance() < 0.1f
+    val shadowEl  = if (isDark) 4.dp else 8.dp
+    val borderAlpha = if (isDark) 0.3f else 0.5f
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = borderAlpha)
+
     Box(modifier = Modifier.width(navBarWidth).height(barHeight), contentAlignment = Alignment.Center) {
-        Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)))
+        // Layer 1: shadow
+        Box(modifier = Modifier.fillMaxSize().shadow(elevation = shadowEl, shape = CircleShape, clip = false))
+        // Layer 2: background solid
+        Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(navBg))
+        // Layer 3: border tipis
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(Color.Transparent)
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color  = borderColor,
+                    radius = size.minDimension / 2f,
+                    style  = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                )
+            }
+        }
         
 
         if (itemWidthPx.value > 0f) {
@@ -212,12 +236,20 @@ fun FloatingNavBar(
     navController : NavHostController,
     onShowAd      : (slot: String, onGranted: () -> Unit) -> Unit = { _, granted -> granted() }
 ) {
+    val isDark      = MaterialTheme.colorScheme.surface.luminance() < 0.1f
+    val floatBg     = MaterialTheme.colorScheme.surfaceContainer
+    val shadowEl    = if (isDark) 4.dp else 10.dp
+    val borderAlpha = if (isDark) 0.25f else 0.45f
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = borderAlpha)
+
     Surface(
-        modifier        = Modifier,
+        modifier        = Modifier
+            .shadow(elevation = shadowEl, shape = RoundedCornerShape(50), clip = false),
         shape           = RoundedCornerShape(50),
-        color           = Color.Transparent,
+        color           = floatBg,
         tonalElevation  = 0.dp,
-        shadowElevation = 0.dp
+        shadowElevation = 0.dp,
+        border          = androidx.compose.foundation.BorderStroke(0.8.dp, borderColor)
     ) {
         Row(
             modifier = Modifier
