@@ -312,6 +312,10 @@ private object StorageTypeCache {
 private fun detectStorageType(): String {
     StorageTypeCache.type?.let { return it }
     val detected = when {
+        // Block device check via root (paling reliable, sama seperti script)
+        try { TweakExecutor.executeWithOutputSync("test -b /dev/block/sda && echo 1").trim() == "1" } catch (_: Exception) { false } -> "UFS"
+        try { TweakExecutor.executeWithOutputSync("test -b /dev/block/by-name/userdata 2>/dev/null && ls -la /dev/block/sda 2>/dev/null | grep -q 'b' && echo 1 || echo 0").trim() == "1" } catch (_: Exception) { false } -> "UFS"
+        // Sysfs checks
         File("/sys/block/sda").exists() -> "UFS"
         File("/sys/class/block/sda").exists() -> "UFS"
         try {
@@ -322,6 +326,8 @@ private fun detectStorageType(): String {
             File("/sys/class/scsi_disk").listFiles()?.any { it.name.startsWith("0:0:0") } == true
         } catch (_: Exception) { false } -> "UFS"
         try { File("/proc/scsi/scsi").readText().contains("UFS", ignoreCase = true) } catch (_: Exception) { false } -> "UFS"
+        // eMMC checks
+        try { TweakExecutor.executeWithOutputSync("test -b /dev/block/mmcblk0 && echo 1").trim() == "1" } catch (_: Exception) { false } -> "eMMC"
         File("/sys/block/mmcblk0").exists() -> "eMMC"
         File("/sys/class/block/mmcblk0").exists() -> "eMMC"
         else -> "Unknown"
@@ -335,6 +341,12 @@ private val UFS_LIFETIME_PATHS_A = listOf(
     "/sys/devices/platform/soc/1d84000.ufshc/health/lifetimeA",
     "/sys/class/block/sda/device/health_descriptor/life_time_estimation_a",
     "/sys/block/sda/device/health_descriptor/life_time_estimation_a",
+    // Exynos / MediaTek ufshci paths
+    "/sys/devices/platform/C400000.gic_CPU/subsystem/drivers/ufshcd/11270000.ufshci/ufstw_lu2/lifetime_est",
+    "/sys/devices/platform/11270000.ufshci/health_descriptor/life_time_estimation_a",
+    "/sys/devices/platform/ufs-exynos/health_descriptor/life_time_estimation_a",
+    // Generic ufshcd scan
+    "/sys/bus/platform/drivers/ufshcd/*/health_descriptor/life_time_estimation_a",
 )
 
 private val UFS_LIFETIME_PATHS_B = listOf(
@@ -342,6 +354,11 @@ private val UFS_LIFETIME_PATHS_B = listOf(
     "/sys/devices/platform/soc/1d84000.ufshc/health/lifetimeB",
     "/sys/class/block/sda/device/health_descriptor/life_time_estimation_b",
     "/sys/block/sda/device/health_descriptor/life_time_estimation_b",
+    // Exynos / MediaTek ufshci paths
+    "/sys/devices/platform/11270000.ufshci/health_descriptor/life_time_estimation_b",
+    "/sys/devices/platform/ufs-exynos/health_descriptor/life_time_estimation_b",
+    // Generic ufshcd scan
+    "/sys/bus/platform/drivers/ufshcd/*/health_descriptor/life_time_estimation_b",
 )
 
 private val EMMC_LIFETIME_PATHS_A = listOf(
@@ -358,6 +375,16 @@ private val EMMC_LIFETIME_PATHS_B = listOf(
 
 private fun tryReadLifetimeHex(paths: List<String>): String? {
     for (path in paths) {
+        // Handle wildcard glob paths via shell (e.g. ufshcd/*/health_descriptor/...)
+        if (path.contains("*")) {
+            try {
+                val raw = TweakExecutor.executeWithOutputSync(
+                    "for f in $path; do [ -f \"\$f\" ] && cat \"\$f\" 2>/dev/null && break; done"
+                ).trim()
+                if (raw.isNotEmpty()) return raw
+            } catch (_: Exception) {}
+            continue
+        }
         val raw = tryReadSysFile(path)?.trim() ?: continue
         if (raw.isNotEmpty()) return raw
     }
@@ -366,22 +393,52 @@ private fun tryReadLifetimeHex(paths: List<String>): String? {
 
 private fun fallbackBruteLifetime(): Pair<String?, String?> {
     val results = mutableListOf<String>()
+
+    // Prioritas: shell find via root (sama persis seperti script ufsV3.0.sh)
     try {
-        val dirs = listOf(
-            "/sys/devices/platform/soc",
-            "/sys/block/sda/device",
-            "/sys/block/mmcblk0/device",
+        val shellResult = TweakExecutor.executeWithOutputSync(
+            "find /sys -type f -name '*life*' 2>/dev/null | head -30"
         )
-        for (dir in dirs) {
-            val base = File(dir)
-            if (!base.exists()) continue
-            base.walkTopDown().maxDepth(4).filter { it.isFile && it.name.contains("life", ignoreCase = true) }.take(10).forEach { f ->
-                val v = tryReadSysFile(f.absolutePath) ?: return@forEach
-                if (v.matches(Regex("0x[0-9A-Fa-f]+"))) results.add(v)
-            }
+        shellResult.lines().forEach { path ->
+            val trimmed = path.trim()
+            if (trimmed.isEmpty()) return@forEach
+            val v = TweakExecutor.executeWithOutputSync("cat \"$trimmed\" 2>/dev/null")
+                .trim().replace("\\s".toRegex(), "")
+            if (v.matches(Regex("0x[0-9A-Fa-f]+"))) results.add(v)
         }
     } catch (_: Exception) {}
-    return Pair(results.getOrNull(0), results.getOrNull(1))
+
+    // Fallback: Kotlin File walkTopDown jika shell gagal
+    if (results.isEmpty()) {
+        try {
+            val dirs = listOf(
+                "/sys/devices/platform/soc",
+                "/sys/devices/platform",
+                "/sys/block/sda/device",
+                "/sys/block/mmcblk0/device",
+            )
+            for (dir in dirs) {
+                if (results.size >= 2) break
+                val base = File(dir)
+                if (!base.exists()) continue
+                base.walkTopDown().maxDepth(6)
+                    .filter { it.isFile && it.name.contains("life", ignoreCase = true) }
+                    .take(15)
+                    .forEach { f ->
+                        val v = tryReadSysFile(f.absolutePath)?.trim()
+                            ?.replace("\\s".toRegex(), "") ?: return@forEach
+                        if (v.matches(Regex("0x[0-9A-Fa-f]+"))) results.add(v)
+                    }
+            }
+        } catch (_: Exception) {}
+    }
+
+    // Jika hanya dapat 1 nilai (slot A = slot B seperti di script)
+    return when (results.size) {
+        0    -> Pair(null, null)
+        1    -> Pair(results[0], results[0])
+        else -> Pair(results[0], results[1])
+    }
 }
 
 private fun mapUfsPct(hex: String?): Int? {
@@ -427,6 +484,8 @@ private fun readStorageTempC(): Int? {
 private fun String.containsAny(vararg keys: String): Boolean = keys.any { this.contains(it) }
 
 fun readStorageHealth(): StorageHealth {
+    // Reset cache jika sebelumnya Unknown supaya re-detect dengan root yang mungkin sudah aktif
+    if (StorageTypeCache.type == "Unknown") StorageTypeCache.type = null
     val type = detectStorageType()
 
     val (rawA, rawB, mapFn) = when (type) {
