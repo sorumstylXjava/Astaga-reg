@@ -78,14 +78,22 @@ fun GameBoostDetailScreen(
     packageName: String,
     lang: String,
     prefManager: PreferenceManager,
-    onShowAd: (onGranted: () -> Unit) -> Unit = { it() }
+    onShowAd: (onGranted: () -> Unit) -> Unit = { _ -> }
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Gate iklan — onGranted hanya dipanggil kalau user sudah nonton minimal 8 detik
+    // Kalau skip sebelum 8 detik, callback TIDAK dieksekusi
+    val adStartTimeRef = remember { mutableStateOf(0L) }
+
     val showAdSafe: (((() -> Unit) -> Unit)) = { onGranted ->
+        adStartTimeRef.value = System.currentTimeMillis()
         onShowAd {
-            onGranted()
+            val elapsed = System.currentTimeMillis() - adStartTimeRef.value
+            if (elapsed >= 8_000L) {
+                onGranted()
+            }
         }
     }
 
@@ -1066,7 +1074,7 @@ private fun GBGraphicsDriverSection(
     isApplying: Boolean, lang: String,
     onDriver: (String) -> Unit,
     onApply: () -> Unit,
-    onShowAd: (onGranted: () -> Unit) -> Unit = { it() }
+    onShowAd: (onGranted: () -> Unit) -> Unit = { _ -> }
 ) {
     val driverOptions = listOf("skia_vulkan" to "Skia Vulkan", "skia_gl" to "Skia GL", "opengl" to "OpenGL", "default" to stringResource(R.string.status_default))
     val driverDescriptions = mapOf(
@@ -1155,7 +1163,7 @@ private fun GBDownscaleSection(
     isApplying: Boolean, lang: String,
     onScale: (String) -> Unit, onFps: (String) -> Unit, onLockFps: (Boolean) -> Unit,
     onDsMethod: (String) -> Unit,
-    onApply: () -> Unit, onReset: () -> Unit, onShowAd: (onGranted: () -> Unit) -> Unit = { it() }
+    onApply: () -> Unit, onReset: () -> Unit, onShowAd: (onGranted: () -> Unit) -> Unit = { _ -> }
 ) {
     val scaleOptions = listOf("0.3" to "0.3x", "0.4" to "0.4x", "0.5" to "0.5x", "0.6" to "0.6x", "0.7" to "0.7x", "0.75" to "0.75x", "0.8" to "0.8x", "0.9" to "0.9x", "1.0" to "1.0x", "disable" to "Off")
     val fpsOptions = listOf("30", "60", "90", "120", "144")

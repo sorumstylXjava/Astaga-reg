@@ -898,4 +898,26 @@
 <string name="payment_sociabuzz_desc">Para sa mga internasyonal na gumagamit · Credit card, PayPal, global na paraan</string>
 <string name="payment_recommended">Inirerekomenda</string>
 <string name="payment_auto_message_info">Ang mensahe ng donasyon ay awtomatikong napunan. Huwag baguhin ito para ma-activate ang premium nang awtomatiko.</string>
+<string name="freeform_label">Floating Window</string>
+    <string name="freeform_title">Freeform Mode</string>
+    <string name="freeform_desc">Patakbuhin ang anumang app sa isang maliit na window na maaaring i-drag at baguhin ang sukat</string>
+    <string name="freeform_no_access">WALANG ACCESS</string>
+    <string name="freeform_toggle_desc">I-enable o i-disable ang Android freeform support sa buong system</string>
+    <string name="freeform_status_on">Freeform: Aktibo</string>
+    <string name="freeform_status_off">Freeform: Hindi Aktibo</string>
+    <string name="freeform_enabled_ok">Matagumpay na na-enable ang freeform mode</string>
+    <string name="freeform_disabled_ok">Matagumpay na na-disable ang freeform mode</string>
+    <string name="freeform_failed">Nabigo ang pagbabago ng estado ng freeform</string>
+    <string name="freeform_window_size_title">Preset ng Sukat ng Window</string>
+    <string name="freeform_size_small">Maliit</string>
+    <string name="freeform_size_medium">Katamtaman</string>
+    <string name="freeform_size_large">Malaki</string>
+    <string name="freeform_size_hint">Pumili ng sukat bago buksan ang app sa floating window</string>
+    <string name="freeform_launch_title">Buksan ang App sa Floating Window</string>
+    <string name="freeform_pkg_hint">Package name (hal. com.example.app)</string>
+    <string name="freeform_launch_btn">Buksan sa Window</string>
+    <string name="freeform_launch_ok">Nabuksan ang app sa freeform window</string>
+    <string name="freeform_launch_failed">Nabigo ang pagbubukas. Suriin ang package name o i-enable muna ang freeform</string>
+    <string name="freeform_launch_requires_enabled">I-enable muna ang freeform mode bago magbukas ng app</string>
+    <string name="freeform_tip">Tip: Pagkatapos buksan, i-drag ang title bar para ilipat ang window at i-drag ang mga gilid para baguhin ang sukat</string>
 </resources>

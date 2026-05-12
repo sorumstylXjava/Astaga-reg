@@ -898,4 +898,26 @@
 <string name="payment_recommended">Rekomendasi</string>
 <string name="payment_auto_message_info">Pesan donasi sudah terisi otomatis. Jangan ubah isi pesan agar premium bisa aktif otomatis.</string>
 <string name="payment_sheet_package">Paket: %s</string>
+    <string name="freeform_label">Jendela Mengambang</string>
+    <string name="freeform_title">Mode Freeform</string>
+    <string name="freeform_desc">Jalankan aplikasi apa saja di jendela kecil yang bisa digeser dan diubah ukurannya</string>
+    <string name="freeform_no_access">TIDAK ADA AKSES</string>
+    <string name="freeform_toggle_desc">Aktifkan atau nonaktifkan dukungan freeform Android secara global</string>
+    <string name="freeform_status_on">Freeform: Aktif</string>
+    <string name="freeform_status_off">Freeform: Tidak Aktif</string>
+    <string name="freeform_enabled_ok">Mode freeform berhasil diaktifkan</string>
+    <string name="freeform_disabled_ok">Mode freeform berhasil dinonaktifkan</string>
+    <string name="freeform_failed">Gagal mengubah status freeform</string>
+    <string name="freeform_window_size_title">Preset Ukuran Jendela</string>
+    <string name="freeform_size_small">Kecil</string>
+    <string name="freeform_size_medium">Sedang</string>
+    <string name="freeform_size_large">Besar</string>
+    <string name="freeform_size_hint">Pilih ukuran sebelum membuka aplikasi di jendela mengambang</string>
+    <string name="freeform_launch_title">Buka Aplikasi di Jendela Mengambang</string>
+    <string name="freeform_pkg_hint">Nama paket aplikasi (cth: com.example.app)</string>
+    <string name="freeform_launch_btn">Buka di Jendela</string>
+    <string name="freeform_launch_ok">Aplikasi berhasil dibuka di jendela mengambang</string>
+    <string name="freeform_launch_failed">Gagal membuka. Periksa nama paket atau aktifkan freeform terlebih dahulu</string>
+    <string name="freeform_launch_requires_enabled">Aktifkan mode freeform terlebih dahulu sebelum membuka aplikasi</string>
+    <string name="freeform_tip">Tips: Setelah dibuka, seret title bar untuk memindahkan jendela dan seret sudutnya untuk mengubah ukuran</string>
 </resources>

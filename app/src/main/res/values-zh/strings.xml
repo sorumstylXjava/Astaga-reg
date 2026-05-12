@@ -895,5 +895,27 @@
 <string name="payment_sociabuzz_desc">适用于国际用户 · 信用卡、PayPal、全球支付方式</string>
 <string name="payment_recommended">推荐</string>
 <string name="payment_auto_message_info">捐款留言已自动填写，请勿更改，以便自动激活高级版。</string>
+<string name="freeform_label">悬浮窗口</string>
+    <string name="freeform_title">自由窗口模式</string>
+    <string name="freeform_desc">将任意应用以可拖动、可调整大小的悬浮窗运行</string>
+    <string name="freeform_no_access">无访问权限</string>
+    <string name="freeform_toggle_desc">全局启用或禁用 Android 自由窗口支持</string>
+    <string name="freeform_status_on">自由窗口：已启用</string>
+    <string name="freeform_status_off">自由窗口：已禁用</string>
+    <string name="freeform_enabled_ok">自由窗口模式已成功启用</string>
+    <string name="freeform_disabled_ok">自由窗口模式已成功禁用</string>
+    <string name="freeform_failed">更改自由窗口状态失败</string>
+    <string name="freeform_window_size_title">窗口大小预设</string>
+    <string name="freeform_size_small">小</string>
+    <string name="freeform_size_medium">中</string>
+    <string name="freeform_size_large">大</string>
+    <string name="freeform_size_hint">在悬浮窗启动应用前，请先选择窗口大小</string>
+    <string name="freeform_launch_title">在悬浮窗中启动应用</string>
+    <string name="freeform_pkg_hint">应用包名（例如：com.example.app）</string>
+    <string name="freeform_launch_btn">在窗口中启动</string>
+    <string name="freeform_launch_ok">应用已在悬浮窗中成功启动</string>
+    <string name="freeform_launch_failed">启动失败，请检查包名或先启用自由窗口模式</string>
+    <string name="freeform_launch_requires_enabled">请先启用自由窗口模式再启动应用</string>
+    <string name="freeform_tip">提示：启动后，可拖动标题栏移动窗口，拖动边缘调整窗口大小</string>
 
 </resources>

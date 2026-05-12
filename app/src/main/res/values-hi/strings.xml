@@ -898,4 +898,26 @@
 <string name="payment_sociabuzz_desc">अंतर्राष्ट्रीय उपयोगकर्ताओं के लिए · क्रेडिट कार्ड, PayPal, वैश्विक तरीके</string>
 <string name="payment_recommended">अनुशंसित</string>
 <string name="payment_auto_message_info">डोनेशन संदेश स्वचालित रूप से भरा गया है। प्रीमियम स्वचालित रूप से सक्रिय करने के लिए इसे न बदलें।</string>
+    <string name="freeform_label">फ्लोटिंग विंडो</string>
+    <string name="freeform_title">फ्रीफॉर्म मोड</string>
+    <string name="freeform_desc">किसी भी ऐप को एक छोटी, खींचने योग्य और आकार बदलने योग्य विंडो में चलाएं</string>
+    <string name="freeform_no_access">कोई पहुँच नहीं</string>
+    <string name="freeform_toggle_desc">Android फ्रीफॉर्म सपोर्ट को वैश्विक रूप से सक्षम या अक्षम करें</string>
+    <string name="freeform_status_on">फ्रीफॉर्म: सक्रिय</string>
+    <string name="freeform_status_off">फ्रीफॉर्म: निष्क्रिय</string>
+    <string name="freeform_enabled_ok">फ्रीफॉर्म मोड सफलतापूर्वक सक्षम किया गया</string>
+    <string name="freeform_disabled_ok">फ्रीफॉर्म मोड सफलतापूर्वक अक्षम किया गया</string>
+    <string name="freeform_failed">फ्रीफॉर्म स्थिति बदलने में विफल</string>
+    <string name="freeform_window_size_title">विंडो आकार प्रीसेट</string>
+    <string name="freeform_size_small">छोटा</string>
+    <string name="freeform_size_medium">मध्यम</string>
+    <string name="freeform_size_large">बड़ा</string>
+    <string name="freeform_size_hint">फ्लोटिंग विंडो में ऐप खोलने से पहले एक आकार चुनें</string>
+    <string name="freeform_launch_title">फ्लोटिंग विंडो में ऐप खोलें</string>
+    <string name="freeform_pkg_hint">पैकेज नाम (उदा. com.example.app)</string>
+    <string name="freeform_launch_btn">विंडो में खोलें</string>
+    <string name="freeform_launch_ok">ऐप फ्रीफॉर्म विंडो में खुला</string>
+    <string name="freeform_launch_failed">खोलने में विफल। पैकेज नाम जाँचें या पहले फ्रीफॉर्म सक्षम करें</string>
+    <string name="freeform_launch_requires_enabled">ऐप खोलने से पहले फ्रीफॉर्म मोड सक्षम करें</string>
+    <string name="freeform_tip">सुझाव: खुलने के बाद, विंडो को हिलाने के लिए टाइटल बार को खींचें और आकार बदलने के लिए किनारे खींचें</string>
 </resources>
