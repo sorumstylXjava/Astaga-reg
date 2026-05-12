@@ -172,10 +172,10 @@ fun resolveGpuFreqAndMax(): Pair<Int, Int> {
         if (mhz > 0) {
             GpuBackendCache.freqPath = path
             GpuBackendCache.detectedName = when {
-                path.contains("kgsl")                           -> "Adreno"
+                path.contains("kgsl")                            -> "Adreno"
                 path.contains("mtk") || path.contains("gpufreq") -> "Mali MTK"
-                path.contains("mali")                           -> "Mali"
-                else                                            -> "GPU"
+                path.contains("mali")                            -> "Mali"
+                else                                             -> "GPU"
             }
             val maxMhz = resolveGpuMaxMhz()
             GpuBackendCache.maxFreqMhz = maxMhz
@@ -293,6 +293,18 @@ fun readRamInfo(context: Context): RamInfo {
 
 data class StorageInfo(val totalGb: Float, val usedGb: Float, val freeGb: Float, val type: String)
 
+data class StorageHealth(
+    val type: String,
+    val slotA: String,
+    val slotAPct: Int?,
+    val slotB: String,
+    val slotBPct: Int?,
+    val overallPct: Int?,
+    val overallStatus: String,
+    val tempC: Int?,
+    val isSupported: Boolean
+)
+
 private object StorageTypeCache {
     var type: String? = null
 }
@@ -300,17 +312,168 @@ private object StorageTypeCache {
 private fun detectStorageType(): String {
     StorageTypeCache.type?.let { return it }
     val detected = when {
-        try { File("/proc/scsi/scsi").readText().contains("UFS", ignoreCase = true) } catch (_: Exception) { false } -> "UFS"
-        File("/sys/block/mmcblk0").exists() -> "eMMC"
         File("/sys/block/sda").exists() -> {
             val vendor = try { File("/sys/block/sda/device/vendor").readText().trim() } catch (_: Exception) { "" }
             val model  = try { File("/sys/block/sda/device/model").readText().trim() } catch (_: Exception) { "" }
-            if (vendor.isNotEmpty() || model.isNotEmpty()) "UFS" else "Unknown"
+            val rev    = try { File("/sys/block/sda/device/rev").readText().trim() } catch (_: Exception) { "" }
+            if (vendor.isNotEmpty() || model.isNotEmpty() || rev.isNotEmpty()) "UFS" else "Unknown"
         }
+        try { File("/proc/scsi/scsi").readText().contains("UFS", ignoreCase = true) } catch (_: Exception) { false } -> "UFS"
+        File("/sys/class/block/sda").exists() -> "UFS"
+        File("/sys/block/mmcblk0").exists() -> "eMMC"
         else -> "Unknown"
     }
     StorageTypeCache.type = detected
     return detected
+}
+
+private val UFS_LIFETIME_PATHS_A = listOf(
+    "/sys/devices/platform/soc/1d84000.ufshc/health_descriptor/life_time_estimation_a",
+    "/sys/devices/platform/soc/1d84000.ufshc/health/lifetimeA",
+    "/sys/class/block/sda/device/health_descriptor/life_time_estimation_a",
+    "/sys/block/sda/device/health_descriptor/life_time_estimation_a",
+)
+
+private val UFS_LIFETIME_PATHS_B = listOf(
+    "/sys/devices/platform/soc/1d84000.ufshc/health_descriptor/life_time_estimation_b",
+    "/sys/devices/platform/soc/1d84000.ufshc/health/lifetimeB",
+    "/sys/class/block/sda/device/health_descriptor/life_time_estimation_b",
+    "/sys/block/sda/device/health_descriptor/life_time_estimation_b",
+)
+
+private val EMMC_LIFETIME_PATHS_A = listOf(
+    "/sys/block/mmcblk0/device/life_time_est_typ_a",
+    "/sys/block/mmcblk0/device/life_time",
+    "/sys/class/block/mmcblk0/device/life_time_est_typ_a",
+)
+
+private val EMMC_LIFETIME_PATHS_B = listOf(
+    "/sys/block/mmcblk0/device/life_time_est_typ_b",
+    "/sys/block/mmcblk0/device/life_time_b",
+    "/sys/class/block/mmcblk0/device/life_time_est_typ_b",
+)
+
+private fun tryReadLifetimeHex(paths: List<String>): String? {
+    for (path in paths) {
+        val raw = tryReadSysFile(path)?.trim() ?: continue
+        if (raw.isNotEmpty()) return raw
+    }
+    return null
+}
+
+private fun fallbackBruteLifetime(): Pair<String?, String?> {
+    val results = mutableListOf<String>()
+    try {
+        val dirs = listOf(
+            "/sys/devices/platform/soc",
+            "/sys/block/sda/device",
+            "/sys/block/mmcblk0/device",
+        )
+        for (dir in dirs) {
+            val base = File(dir)
+            if (!base.exists()) continue
+            base.walkTopDown().maxDepth(4).filter { it.isFile && it.name.contains("life", ignoreCase = true) }.take(10).forEach { f ->
+                val v = tryReadSysFile(f.absolutePath) ?: return@forEach
+                if (v.matches(Regex("0x[0-9A-Fa-f]+"))) results.add(v)
+            }
+        }
+    } catch (_: Exception) {}
+    return Pair(results.getOrNull(0), results.getOrNull(1))
+}
+
+private fun mapUfsPct(hex: String?): Int? {
+    if (hex == null) return null
+    val normalized = hex.trim().lowercase().removePrefix("0x")
+    return when (normalized) {
+        "00"  -> 100; "01" -> 95; "02" -> 90; "03" -> 85
+        "04"  -> 80;  "05" -> 75; "06" -> 70; "07" -> 60
+        "08"  -> 50;  "09" -> 30; "0a" -> 20; "0b" -> 10
+        else  -> null
+    }
+}
+
+private fun mapEmmcPct(hex: String?): Int? {
+    if (hex == null) return null
+    val normalized = hex.trim().lowercase().removePrefix("0x")
+    return when (normalized) {
+        "00" -> 100; "01" -> 90; "02" -> 80; "03" -> 70
+        "04" -> 60;  "05" -> 50; "06" -> 40; "07" -> 30
+        "08" -> 20;  "09" -> 10; "0a" -> 5
+        else -> null
+    }
+}
+
+private fun readStorageTempC(): Int? {
+    try {
+        val thermalDir = File("/sys/class/thermal")
+        if (!thermalDir.exists()) return null
+        thermalDir.listFiles()?.forEach { zone ->
+            val typeFile = File(zone, "type")
+            if (!typeFile.exists()) return@forEach
+            val typeName = typeFile.readText().trim().lowercase()
+            if (typeName.containsAny("ufs", "emmc", "flash", "storage")) {
+                val raw = File(zone, "temp").readText().trim().toLongOrNull() ?: return@forEach
+                val celsius = if (raw > 1000) (raw / 1000).toInt() else raw.toInt()
+                if (celsius in 0..100) return celsius
+            }
+        }
+    } catch (_: Exception) {}
+    return null
+}
+
+private fun String.containsAny(vararg keys: String): Boolean = keys.any { this.contains(it) }
+
+fun readStorageHealth(): StorageHealth {
+    val type = detectStorageType()
+
+    val (rawA, rawB, mapFn) = when (type) {
+        "UFS" -> Triple(
+            tryReadLifetimeHex(UFS_LIFETIME_PATHS_A),
+            tryReadLifetimeHex(UFS_LIFETIME_PATHS_B),
+            ::mapUfsPct
+        )
+        "eMMC" -> Triple(
+            tryReadLifetimeHex(EMMC_LIFETIME_PATHS_A),
+            tryReadLifetimeHex(EMMC_LIFETIME_PATHS_B),
+            ::mapEmmcPct
+        )
+        else -> Triple(null, null, ::mapUfsPct)
+    }
+
+    val (fallA, fallB) = if (rawA == null && rawB == null) fallbackBruteLifetime() else Pair(rawA, rawB)
+    val finalA = rawA ?: fallA
+    val finalB = rawB ?: fallB
+
+    val pctA = mapFn(finalA)
+    val pctB = mapFn(finalB)
+    val overallPct = when {
+        pctA != null && pctB != null -> (pctA + pctB) / 2
+        pctA != null -> pctA
+        pctB != null -> pctB
+        else         -> null
+    }
+
+    val status = when {
+        overallPct == null        -> "UNKNOWN"
+        overallPct >= 90          -> "HEALTHY"
+        overallPct >= 60          -> "CAUTION"
+        else                      -> "CRITICAL"
+    }
+
+    val tempC = readStorageTempC()
+    val isSupported = finalA != null || finalB != null
+
+    return StorageHealth(
+        type          = type,
+        slotA         = finalA ?: "N/A",
+        slotAPct      = pctA,
+        slotB         = finalB ?: "N/A",
+        slotBPct      = pctB,
+        overallPct    = overallPct,
+        overallStatus = status,
+        tempC         = tempC,
+        isSupported   = isSupported
+    )
 }
 
 fun readStorageInfo(): StorageInfo {
@@ -378,6 +541,7 @@ fun MonitorScreen(
     var ramInfo     by remember { mutableStateOf(RamInfo(0, 0, 0, 0)) }
     var battTempC   by remember { mutableStateOf(-1f) }
     var storageInfo by remember { mutableStateOf(StorageInfo(0f, 0f, 0f, "—")) }
+    var storageHealth by remember { mutableStateOf<StorageHealth?>(null) }
 
     LaunchedEffect(Unit) {
         var prevSnap: CpuStatSnapshot? = null
@@ -432,7 +596,7 @@ fun MonitorScreen(
                 gpuName    = GpuBackendCache.detectedName
             }
             if (gpuLoad >= 0f) gpuHistory = (gpuHistory + gpuLoad).takeLast(60)
-            delay(1500)
+            delay(1000)
         }
     }
 
@@ -444,6 +608,18 @@ fun MonitorScreen(
                 storageInfo = readStorageInfo()
             }
             delay(3000)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            storageHealth = readStorageHealth()
+        }
+        while (true) {
+            delay(30_000)
+            withContext(Dispatchers.IO) {
+                storageHealth = readStorageHealth()
+            }
         }
     }
 
@@ -512,6 +688,7 @@ fun MonitorScreen(
             MonitorSectionLabel("STORAGE")
             StorageMonitorCard(
                 info        = storageInfo,
+                health      = storageHealth,
                 accentColor = MaterialTheme.colorScheme.primary
             )
 
@@ -993,6 +1170,7 @@ private fun RamMonitorCard(
 @Composable
 private fun StorageMonitorCard(
     info        : StorageInfo,
+    health      : StorageHealth?,
     accentColor : Color
 ) {
     val usedPct = if (info.totalGb > 0) info.usedGb / info.totalGb * 100f else 0f
@@ -1048,5 +1226,148 @@ private fun StorageMonitorCard(
             ),
             color = accentColor
         )
+
+        if (health != null) {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.35f))
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text(
+                    "${health.type} HEALTH",
+                    fontSize      = 9.sp,
+                    fontWeight    = FontWeight.ExtraBold,
+                    letterSpacing = 0.8.sp,
+                    color         = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (health.tempC != null) {
+                    val tempColor = if (health.tempC > 55) MaterialTheme.colorScheme.error else accentColor
+                    Surface(shape = RoundedCornerShape(50), color = tempColor.copy(0.13f)) {
+                        Text(
+                            "${health.tempC}°C",
+                            fontSize   = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = tempColor,
+                            modifier   = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (!health.isSupported) {
+                Text(
+                    "Health data tidak tersedia di device ini",
+                    fontSize = 11.sp,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                val overallColor = when (health.overallStatus) {
+                    "HEALTHY"  -> accentColor
+                    "CAUTION"  -> MaterialTheme.colorScheme.tertiary
+                    "CRITICAL" -> MaterialTheme.colorScheme.error
+                    else       -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StorageHealthSlotCard(
+                        label       = "SLOT A",
+                        hex         = health.slotA,
+                        pct         = health.slotAPct,
+                        accentColor = accentColor,
+                        modifier    = Modifier.weight(1f)
+                    )
+                    StorageHealthSlotCard(
+                        label       = "SLOT B",
+                        hex         = health.slotB,
+                        pct         = health.slotBPct,
+                        accentColor = accentColor,
+                        modifier    = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("OVERALL", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+                        Text(
+                            if (health.overallPct != null) "${health.overallPct}%" else "N/A",
+                            fontSize   = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color      = overallColor
+                        )
+                    }
+                    Surface(
+                        shape  = RoundedCornerShape(10.dp),
+                        color  = overallColor.copy(0.13f),
+                        border = BorderStroke(0.7.dp, overallColor.copy(0.3f))
+                    ) {
+                        Text(
+                            health.overallStatus,
+                            fontSize      = 11.sp,
+                            fontWeight    = FontWeight.ExtraBold,
+                            color         = overallColor,
+                            letterSpacing = 0.5.sp,
+                            modifier      = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+
+                if (health.overallPct != null) {
+                    Spacer(Modifier.height(8.dp))
+                    UsageProgressBar(health.overallPct / 100f, overallColor, height = 5)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageHealthSlotCard(
+    label       : String,
+    hex         : String,
+    pct         : Int?,
+    accentColor : Color,
+    modifier    : Modifier = Modifier
+) {
+    val slotColor = when {
+        pct == null  -> MaterialTheme.colorScheme.onSurfaceVariant
+        pct >= 90    -> accentColor
+        pct >= 60    -> MaterialTheme.colorScheme.tertiary
+        else         -> MaterialTheme.colorScheme.error
+    }
+    Surface(
+        modifier = modifier,
+        shape    = RoundedCornerShape(12.dp),
+        color    = slotColor.copy(0.08f),
+        border   = BorderStroke(0.7.dp, slotColor.copy(0.25f))
+    ) {
+        Column(
+            modifier            = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(label, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.8.sp)
+            Text(
+                if (pct != null) "$pct%" else "N/A",
+                fontSize   = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color      = slotColor
+            )
+            Text(hex, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
