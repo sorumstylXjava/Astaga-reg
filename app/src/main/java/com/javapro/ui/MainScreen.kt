@@ -87,15 +87,11 @@ fun MainScreen(
     val context       = LocalContext.current
     var isPremium     by remember { mutableStateOf(PremiumManager.isPremium(context)) }
 
-    // enableEdgeToEdge() di MainActivity sudah handle nav bar transparent.
-    // Tidak perlu SideEffect manual di sini — itu yang menyebabkan bug di screen lain.
-
     val windowSize    = rememberWindowSizeInfo()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute      = navBackStackEntry?.destination?.route ?: "home"
 
-    // Re-check premium setiap pindah route
     LaunchedEffect(currentRoute) {
         val fresh = PremiumManager.isPremium(context)
         if (fresh != isPremium) isPremium = fresh
@@ -104,7 +100,6 @@ fun MainScreen(
     var useFloatingNav by remember { mutableStateOf(getNavBarStyle(context)) }
     LaunchedEffect(currentRoute) { useFloatingNav = getNavBarStyle(context) }
 
-    // Daily reward screen bukan top-level, jadi nav bar disembunyikan
     val topLevelRoutes = setOf("home", "gamelist", "tweaks", "settings")
     val showNav        = currentRoute in topLevelRoutes
 
@@ -193,13 +188,10 @@ private fun DesktopLayout(
                     Spacer(Modifier.weight(1f))
                 }
 
-                VerticalDivider(
-                    thickness = 0.5.dp,
-                    color     = MaterialTheme.colorScheme.outlineVariant
-                )
+                VerticalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             }
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 Box(modifier = Modifier.weight(1f)) {
                     NavContent(
                         navController = navController,
@@ -227,7 +219,7 @@ private fun MobileLayout(
     prefManager    : PreferenceManager,
     onShowAd       : (String, () -> Unit) -> Unit
 ) {
-    var navIsVisible   by remember { mutableStateOf(true) }
+    var navIsVisible by remember { mutableStateOf(true) }
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
@@ -242,20 +234,11 @@ private fun MobileLayout(
     val density           = androidx.compose.ui.platform.LocalDensity.current
     val systemNavHeightDp = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
 
-    // Banner height ~50dp — NavBar free user harus naik sebesar ini
-    val bannerHeightDp    = if (!isPremium) 50.dp else 0.dp
-
-    // Konten padding: nav bar + banner saja — systemNav sudah di-handle enableEdgeToEdge
-    val contentBottomPad  = if (showNav)
-        58.dp + 4.dp + bannerHeightDp
-    else
-        bannerHeightDp
-
-    // NavBar bottom offset: di atas banner + system nav (agar nav bar tidak ketutup gesture handle)
-    val navBarBottomPad   = systemNavHeightDp + bannerHeightDp
+    val bannerHeightDp   = if (!isPremium) 50.dp else 0.dp
+    val contentBottomPad = if (showNav) 58.dp + 4.dp + bannerHeightDp else bannerHeightDp
+    val navBarBottomPad  = systemNavHeightDp + bannerHeightDp
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Konten utama — scroll penuh, navbar mengambang di atas
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -269,7 +252,6 @@ private fun MobileLayout(
             )
         }
 
-        // Nav bar melayang — premium: mentok bawah, free: di atas banner
         if (showNav) {
             Box(
                 modifier = Modifier
@@ -289,7 +271,6 @@ private fun MobileLayout(
             }
         }
 
-        // Banner ad — selalu di paling bawah di atas system nav bar
         if (!isPremium) {
             BannerAdView(
                 modifier = Modifier
@@ -361,8 +342,7 @@ private fun NavContent(
         composable("debug_tools")   { DebugToolsScreen(navController = navController, prefManager = prefManager, lang = lang) }
         composable("screen_record") { ScreenRecordScreen(navController = navController, lang = lang) }
         composable("battery")       { BatteryScreen(navController = navController, lang = lang) }
-        composable("freeform_launcher") { FreeformLauncherScreen(navController = navController, lang = lang) }
-        // ── Daily Reward Screen ──────────────────────────────────────
+        composable("monitor")       { MonitorScreen(navController = navController, prefManager = prefManager) }
         composable("daily_reward") {
             val activity = LocalContext.current.findActivity()
             DailyRewardScreen(
@@ -378,7 +358,6 @@ private fun NavContent(
                 lang          = lang
             )
         }
-
         composable("device_spoof") {
             val activity = LocalContext.current.findActivity()
             DeviceSpoofScreen(
@@ -394,7 +373,6 @@ private fun NavContent(
                 }
             )
         }
-
         composable("google_account") {
             GoogleAccountScreen(navController = navController, lang = lang)
         }

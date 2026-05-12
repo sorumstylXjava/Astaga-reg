@@ -6,12 +6,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 
 import android.app.Activity
-import android.app.ActivityOptions
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.graphics.Rect
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -780,14 +777,6 @@ fun ExclusiveFeaturesScreen(navController: NavController, prefManager: Preferenc
                         desc    = if (isId) "Charge limit, kesehatan & riwayat" else "Charge limit, health & history",
                         tint    = Color(0xFF66BB6A),
                         onClick = { navController.navigate("battery") }
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
-                    ExShortcutButton(
-                        icon    = Icons.Default.OpenInNew,
-                        title   = stringResource(R.string.freeform_label),
-                        desc    = stringResource(R.string.freeform_desc),
-                        tint    = Color(0xFF7C4DFF),
-                        onClick = { navController.navigate("freeform_launcher") }
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
                     ExShortcutButton(

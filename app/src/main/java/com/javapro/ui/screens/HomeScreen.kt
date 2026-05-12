@@ -1,9 +1,8 @@
 package com.javapro.ui.screens
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-
-
 
 import com.javapro.utils.ShizukuManager
 import android.content.Intent
@@ -54,13 +53,12 @@ data class CpuClusterInfo(
     val name           : String,
     val cores          : List<Int>,
     val currentFreqMhz : Int,
-    val maxFreqMhz     : Int,
-    val color          : Color
+    val maxFreqMhz     : Int
 )
 
 data class CpuStatSnapshot(val idle: Long, val total: Long)
 
-private object CpuClusterCache {
+object CpuClusterCache {
     var clusters: List<CpuClusterInfo> = emptyList()
     var lastUpdated: Long = 0L
 }
@@ -69,12 +67,12 @@ suspend fun readCpuStatSnapshot(): CpuStatSnapshot {
     return try {
         val directLine = try {
             withContext(Dispatchers.IO) { File("/proc/stat").readLines().firstOrNull { it.startsWith("cpu ") } }
-        } catch (e: Exception) { null }
+        } catch (_: Exception) { null }
         val rawOutput = if (directLine == null) TweakExecutor.executeWithOutput("cat /proc/stat") else null
         val line = directLine ?: rawOutput?.lines()?.firstOrNull { it.startsWith("cpu ") } ?: return CpuStatSnapshot(0L, 0L)
         val parts = line.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.drop(1).map { it.toLongOrNull() ?: 0L }
         CpuStatSnapshot(parts.getOrElse(3) { 0L } + parts.getOrElse(4) { 0L }, parts.sum())
-    } catch (e: Exception) { CpuStatSnapshot(0L, 0L) }
+    } catch (_: Exception) { CpuStatSnapshot(0L, 0L) }
 }
 
 fun calcCpuUsage(s1: CpuStatSnapshot, s2: CpuStatSnapshot): Float {
@@ -87,11 +85,6 @@ private fun readFreqDirect(path: String): Long {
     return try { File(path).readText().trim().toLongOrNull() ?: 0L } catch (_: Exception) { 0L }
 }
 
-/**
- * readFreq: coba direct File I/O dulu.
- * Kalau 0 (permission denied / core offline), fallback via shell — Root atau Shizuku.
- * scaling_cur_freq sering permission 400 (root-only) di banyak SoC, jadi fallback wajib ada.
- */
 private fun readFreq(path: String): Long {
     val direct = readFreqDirect(path)
     if (direct > 0L) return direct
@@ -100,11 +93,6 @@ private fun readFreq(path: String): Long {
     } catch (_: Exception) { 0L }
 }
 
-// Baca cluster dari cpufreq/policy* — cara BENAR karena policy folder
-// mencerminkan cluster fisik yang sesungguhnya di SoC.
-// Grouping berdasarkan cpuinfo_max_freq TIDAK akurat karena beberapa SoC
-// (mis. Helio G85, Snapdragon 680) bisa punya max_freq sama di cluster berbeda,
-// sehingga menghasilkan cluster palsu.
 private fun readPolicyClusters(): List<List<Int>> {
     val policyDir = File("/sys/devices/system/cpu/cpufreq")
     if (!policyDir.exists()) return emptyList()
@@ -130,36 +118,29 @@ private fun readPolicyClusters(): List<List<Int>> {
 
 suspend fun readCpuClustersSuspend(): List<CpuClusterInfo> = withContext(Dispatchers.IO) {
     try {
-        val cpuCount = Runtime.getRuntime().availableProcessors()
-
-        // ── Langkah 1: Ambil grup cluster dari policy (akurat) ──────────────
+        val cpuCount   = Runtime.getRuntime().availableProcessors()
         val policyGroups = readPolicyClusters()
 
-        // ── Langkah 2: Fallback ke grouping max_freq kalau policy tidak ada ──
         val groups: List<List<Int>> = if (policyGroups.isNotEmpty()) {
             policyGroups
         } else {
             val maxFreqs = (0 until cpuCount).map { core ->
                 readFreq("/sys/devices/system/cpu/cpu$core/cpufreq/cpuinfo_max_freq")
             }
-            // PENTING: filter 0L (core offline / tidak terbaca) SEBELUM distinct()
-            // Tanpa ini, 0L ikut masuk sebagai "grup" palsu → muncul Big Core fiktif
             val uniqueMax = maxFreqs.filter { it > 0L }.distinct().sorted()
             if (uniqueMax.isEmpty()) return@withContext emptyList()
             uniqueMax.map { maxFreq ->
                 maxFreqs.mapIndexedNotNull { i, f -> if (f == maxFreq) i else null }
-            }.filter { it.isNotEmpty() }  // buang grup kosong
+            }.filter { it.isNotEmpty() }
         }
 
         if (groups.isEmpty()) return@withContext emptyList()
 
-        // ── Langkah 3: Baca frekuensi tiap core ─────────────────────────────
-        // Baca dari policy folder, bukan per-core — lebih reliable saat core offline
-        val policyFreqs = mutableMapOf<Int, Pair<Long, Long>>() // coreFirst -> (cur, max)
+        val policyFreqs = mutableMapOf<Int, Pair<Long, Long>>()
         groups.forEach { cores ->
-            val first = cores.first()
+            val first     = cores.first()
             val policyBase = "/sys/devices/system/cpu/cpufreq/policy$first"
-            val curFreq = readFreq("$policyBase/scaling_cur_freq")
+            val curFreq   = readFreq("$policyBase/scaling_cur_freq")
                 .takeIf { it > 0L }
                 ?: readFreq("$policyBase/cpuinfo_cur_freq")
                     .takeIf { it > 0L }
@@ -167,7 +148,7 @@ suspend fun readCpuClustersSuspend(): List<CpuClusterInfo> = withContext(Dispatc
                     readFreq("/sys/devices/system/cpu/cpu$c/cpufreq/scaling_cur_freq")
                         .takeIf { it > 0L }
                 }.maxOrNull() ?: 0L
-            val maxFreq = readFreq("$policyBase/cpuinfo_max_freq")
+            val maxFreq   = readFreq("$policyBase/cpuinfo_max_freq")
                 .takeIf { it > 0L }
                 ?: cores.mapNotNull { c ->
                     readFreq("/sys/devices/system/cpu/cpu$c/cpufreq/cpuinfo_max_freq")
@@ -182,15 +163,7 @@ suspend fun readCpuClustersSuspend(): List<CpuClusterInfo> = withContext(Dispatc
             Pair(cur, max)
         }
 
-        // ── Langkah 4: Nama cluster sesuai jumlah cluster yang benar-benar ada
-        // Tidak hardcode "Big Core" kalau HP hanya punya 2 cluster
-        val clusterColors = listOf(
-            Color(0xFF64B5F6), // Little — biru
-            Color(0xFFFFD600), // Mid    — kuning
-            Color(0xFFEF5350), // Big    — merah
-            Color(0xFFCE93D8)  // Prime  — ungu
-        )
-        val total = groups.size
+        val total        = groups.size
         val clusterNames = when (total) {
             1    -> listOf("Core")
             2    -> listOf("Little Core", "Big Core")
@@ -199,11 +172,10 @@ suspend fun readCpuClustersSuspend(): List<CpuClusterInfo> = withContext(Dispatc
         }
 
         groups.mapIndexed { index, cores ->
-            val policyData  = policyFreqs[cores.first()]
-            val policyCur   = policyData?.first ?: 0L
-            val policyMax   = policyData?.second ?: 0L
+            val policyData = policyFreqs[cores.first()]
+            val policyCur  = policyData?.first ?: 0L
+            val policyMax  = policyData?.second ?: 0L
 
-            // Fallback ke per-core kalau policy tidak ada
             val curValues = if (policyCur > 0L) listOf(policyCur)
                 else cores.mapNotNull { coreFreqs.getOrNull(it)?.first?.takeIf { v -> v > 0L } }
             val maxValues = if (policyMax > 0L) listOf(policyMax)
@@ -216,13 +188,11 @@ suspend fun readCpuClustersSuspend(): List<CpuClusterInfo> = withContext(Dispatc
                 name           = clusterNames.getOrElse(index) { "Cluster ${index + 1}" },
                 cores          = cores,
                 currentFreqMhz = (avgCur / 1000).toInt(),
-                maxFreqMhz     = (maxFreq / 1000).toInt(),
-                color          = clusterColors.getOrElse(index) { Color(0xFFCE93D8) }
+                maxFreqMhz     = (maxFreq / 1000).toInt()
             )
         }
-    } catch (e: Exception) { emptyList() }
+    } catch (_: Exception) { emptyList() }
 }
-
 
 private const val AD_MIN_WATCH_SECONDS = 13
 
@@ -237,13 +207,12 @@ fun HomeScreen(
     val context         = LocalContext.current
     val isRooted        = remember { TweakExecutor.checkRoot() }
     val info            = remember { TweakExecutor.getDeviceInfo(context) }
-    val isShizukuActive = remember { com.javapro.utils.ShizukuManager.isAvailable() }
+    val isShizukuActive = remember { ShizukuManager.isAvailable() }
     val isPremium       = remember { PremiumManager.isPremium(context) }
     val premiumType     = remember { PremiumManager.getPremiumType(context) }
     val expiryMs        = remember { PremiumManager.getExpiryMs(context) }
 
     val isPerfModeActive by TweakManager.isPerformanceActive.collectAsState()
-    val fpsEnabled  by prefManager.fpsEnabledFlow.collectAsState(initial = false)
     val isDark      by prefManager.darkModeFlow.collectAsState()
 
     var showMenu     by remember { mutableStateOf(false) }
@@ -297,7 +266,6 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Loop CPU usage: cepat (1 detik) — tidak ada shell, hanya baca /proc/stat
         var prev: CpuStatSnapshot? = null
         while (true) {
             val cur = readCpuStatSnapshot()
@@ -309,16 +277,12 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Pastikan Shizuku service sudah bind sebelum cluster loop mulai
         if (ShizukuManager.isAvailable()) ShizukuManager.ensureBound()
-        // Tunggu sebentar agar bind sempat selesai
         delay(1500)
-        // Loop cluster: terpisah, interval 2 detik — hanya baca File sysfs, tidak ada shell
-        // Dipisahkan agar delay baca freq tidak menghambat update % CPU
         while (true) {
             val result = readCpuClustersSuspend()
             if (result.isNotEmpty()) {
-                CpuClusterCache.clusters = result
+                CpuClusterCache.clusters   = result
                 CpuClusterCache.lastUpdated = System.currentTimeMillis()
             }
             cpuClusters = CpuClusterCache.clusters
@@ -333,15 +297,18 @@ fun HomeScreen(
         label         = "pulseAlpha"
     )
 
-    val cpuColor     = when { cpuUsage >= 80f -> MaterialTheme.colorScheme.error; cpuUsage >= 50f -> MaterialTheme.colorScheme.tertiary; else -> MaterialTheme.colorScheme.primary }
+    val cpuColor     = when {
+        cpuUsage >= 80f -> MaterialTheme.colorScheme.error
+        cpuUsage >= 50f -> MaterialTheme.colorScheme.tertiary
+        else            -> MaterialTheme.colorScheme.primary
+    }
     val displayValue = if (touchedIndex != null && touchedIndex!! < cpuHistory.size) cpuHistory[touchedIndex!!] else cpuUsage
 
     val remainingDays    = if (isPremium && premiumType != "permanent") ((expiryMs - System.currentTimeMillis()) / (1000L * 60 * 60 * 24)).coerceAtLeast(0L) else 0L
     val premiumDaysColor = if (isPremium && premiumType != "permanent" && remainingDays <= 2L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
 
-
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor      = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
@@ -350,11 +317,11 @@ fun HomeScreen(
                         Text("JavaPro", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
                         if (isPremium) {
                             val badgeColor = when (premiumType) {
-                                "weekly"    -> Color(0xFF00ACC1)
-                                "monthly"   -> Color(0xFF1E88E5)
-                                "yearly"    -> Color(0xFFFF8F00)
-                                "permanent" -> Color(0xFFAB47BC)
-                                else        -> Color(0xFF1E88E5)
+                                "weekly"    -> MaterialTheme.colorScheme.secondary
+                                "monthly"   -> MaterialTheme.colorScheme.primary
+                                "yearly"    -> MaterialTheme.colorScheme.tertiary
+                                "permanent" -> MaterialTheme.colorScheme.error
+                                else        -> MaterialTheme.colorScheme.primary
                             }
                             val badgeLabel = when (premiumType) {
                                 "weekly"    -> "Plus"
@@ -420,7 +387,7 @@ fun HomeScreen(
                         )
                         HorizontalDivider()
                         DropdownMenuItem(
-                            text        = {
+                            text = {
                                 Row(
                                     modifier              = Modifier.fillMaxWidth(),
                                     verticalAlignment     = Alignment.CenterVertically,
@@ -484,9 +451,9 @@ fun HomeScreen(
                         val customBitmap   = remember(customBannerUri) {
                             if (customBannerUri != null) {
                                 try {
-                                    val uri  = Uri.parse(customBannerUri)
-                                    val ins  = context.contentResolver.openInputStream(uri)
-                                    val bmp  = BitmapFactory.decodeStream(ins)
+                                    val uri = Uri.parse(customBannerUri)
+                                    val ins = context.contentResolver.openInputStream(uri)
+                                    val bmp = BitmapFactory.decodeStream(ins)
                                     ins?.close()
                                     bmp?.asImageBitmap()
                                 } catch (_: Exception) { null }
@@ -533,7 +500,6 @@ fun HomeScreen(
                     .border(BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(36.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-
                     Row(
                         modifier              = Modifier.padding(bottom = 14.dp),
                         verticalAlignment     = Alignment.CenterVertically,
@@ -547,7 +513,6 @@ fun HomeScreen(
                     }
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-
                         Column(
                             modifier            = Modifier.width(86.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -568,7 +533,7 @@ fun HomeScreen(
                                     when {
                                         displayValue >= 80f -> stringResource(R.string.home_cpu_high)
                                         displayValue >= 50f -> stringResource(R.string.home_cpu_med)
-                                        else                -> stringResource(R.string.home_cpu_low)
+                                        else               -> stringResource(R.string.home_cpu_low)
                                     },
                                     fontSize = 10.sp, fontWeight = FontWeight.Bold, color = cpuColor,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -577,38 +542,38 @@ fun HomeScreen(
                             Text("CPU", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                         }
 
+                        val clusterAccentColors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.secondary,
+                            MaterialTheme.colorScheme.tertiary,
+                            MaterialTheme.colorScheme.inversePrimary
+                        )
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            // Tampilkan cluster hanya kalau data sudah tersedia.
-                            // Tidak pakai fallback hardcode karena bisa muncul cluster
-                            // yang tidak ada di HP (mis. Big Core padahal HP hanya 2 cluster)
                             if (cpuClusters.isEmpty()) {
-                                Text(
-                                    "Detecting…",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Text("Detecting…", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             } else {
-                                cpuClusters.take(4).forEach { cluster ->
-                                key(cluster.cores.first()) {   // key by core index, bukan nama — nama bisa duplikat saat list berubah
-                                    val progress = if (cluster.maxFreqMhz > 0) (cluster.currentFreqMhz.toFloat() / cluster.maxFreqMhz).coerceIn(0f, 1f) else 0f
-                                    val animProg by animateFloatAsState(targetValue = progress, animationSpec = tween(600), label = "cp_${cluster.cores.first()}")
-                                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                            Text(cluster.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = cluster.color)
-                                            Text("(${cluster.currentFreqMhz} MHz)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                        Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(cluster.color.copy(0.14f))) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth(animProg)
-                                                    .fillMaxHeight()
-                                                    .clip(RoundedCornerShape(50))
-                                                    .background(Brush.horizontalGradient(listOf(cluster.color.copy(0.65f), cluster.color)))
-                                            )
+                                cpuClusters.take(4).forEachIndexed { i, cluster ->
+                                    key(cluster.cores.first()) {
+                                        val clColor = clusterAccentColors[i % clusterAccentColors.size]
+                                        val progress = if (cluster.maxFreqMhz > 0) (cluster.currentFreqMhz.toFloat() / cluster.maxFreqMhz).coerceIn(0f, 1f) else 0f
+                                        val animProg by animateFloatAsState(targetValue = progress, animationSpec = tween(600), label = "cp_${cluster.cores.first()}")
+                                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                Text(cluster.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = clColor)
+                                                Text("(${cluster.currentFreqMhz} MHz)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(clColor.copy(0.14f))) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth(animProg)
+                                                        .fillMaxHeight()
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(Brush.horizontalGradient(listOf(clColor.copy(0.65f), clColor)))
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
                             }
                         }
                     }
@@ -652,14 +617,7 @@ fun HomeScreen(
                     }
                 }
 
-                FpsMonitorCard(
-                    modifier        = Modifier.weight(1f),
-                    fpsEnabled      = fpsEnabled,
-                    isRooted        = isRooted,
-                    isShizukuActive = isShizukuActive,
-                    prefManager     = prefManager,
-                    navController   = navController
-                )
+                SystemMonitorCard(modifier = Modifier.weight(1f), navController = navController)
             }
 
             Row(
@@ -699,6 +657,42 @@ fun HomeScreen(
             SupportGridSection(lang = lang, isDark = isDark, navController = navController)
 
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SystemMonitorCard(modifier: Modifier, navController: NavController) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(32.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(0.8.dp, MaterialTheme.colorScheme.tertiary.copy(0.22f)), RoundedCornerShape(32.dp))
+            .clickable { navController.navigate("monitor") }
+    ) {
+        Column(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier         = Modifier
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.tertiary.copy(0.16f), RoundedCornerShape(14.dp))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(0.3f)), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Default.Equalizer, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(26.dp)) }
+            Text(
+                "System Monitor",
+                fontWeight = FontWeight.Bold,
+                fontSize   = 14.sp,
+                color      = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                "CPU · GPU · RAM · Storage",
+                fontSize   = 11.sp,
+                color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 15.sp
+            )
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.tertiary.copy(0.7f), modifier = Modifier.size(18.dp))
+            }
         }
     }
 }
@@ -767,10 +761,10 @@ private fun ExclusiveFeaturesCard(lang: String, isDark: Boolean, navController: 
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isPremium || isAdUnlocked) Icons.Default.AutoAwesome else Icons.Default.Lock,
+                        imageVector        = if (isPremium || isAdUnlocked) Icons.Default.AutoAwesome else Icons.Default.Lock,
                         contentDescription = null,
-                        tint        = MaterialTheme.colorScheme.secondary,
-                        modifier    = Modifier.size(22.dp)
+                        tint               = MaterialTheme.colorScheme.secondary,
+                        modifier           = Modifier.size(22.dp)
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -788,7 +782,7 @@ private fun ExclusiveFeaturesCard(lang: String, isDark: Boolean, navController: 
                     )
                     if (!isPremium && !isAdUnlocked) {
                         Spacer(Modifier.height(6.dp))
-                        val prog = adWatchCount.value.toFloat() / AD_REQUIRED.toFloat()
+                        val prog     = adWatchCount.value.toFloat() / AD_REQUIRED.toFloat()
                         val animProg by animateFloatAsState(targetValue = prog.coerceIn(0f, 1f), animationSpec = tween(600), label = "cardProgress")
                         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
@@ -949,28 +943,6 @@ private fun StatusPill(modifier: Modifier = Modifier, icon: ImageVector, label: 
 }
 
 @Composable
-private fun ClusterItem(cluster: CpuClusterInfo, isDark: Boolean) {
-    val progress         = if (cluster.maxFreqMhz > 0) cluster.currentFreqMhz.toFloat() / cluster.maxFreqMhz else 0f
-    val animatedProgress by animateFloatAsState(targetValue = progress.coerceIn(0f, 1f), animationSpec = tween(600), label = "clusterProgress")
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(36.dp).background(cluster.color.copy(0.14f), CircleShape).border(0.8.dp, cluster.color.copy(0.35f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Memory, null, tint = cluster.color, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("${cluster.name} · Core ${cluster.cores.first()}–${cluster.cores.last()}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = cluster.color)
-                Text("${cluster.currentFreqMhz} / ${cluster.maxFreqMhz} MHz", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(5.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(cluster.color.copy(0.13f))) {
-                Box(modifier = Modifier.fillMaxWidth(animatedProgress).fillMaxHeight().clip(RoundedCornerShape(50)).background(Brush.horizontalGradient(listOf(cluster.color.copy(0.65f), cluster.color))))
-            }
-        }
-    }
-}
-
-@Composable
 fun InfoItem(icon: ImageVector, title: String, value: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
@@ -1013,67 +985,3 @@ private fun MonitorChip(modifier: Modifier, label: String, value: String, sub: S
         }
     }
 }
-
-@Composable
-private fun FpsMonitorCard(
-    modifier        : Modifier,
-    fpsEnabled      : Boolean,
-    isRooted        : Boolean,
-    isShizukuActive : Boolean,
-    prefManager     : PreferenceManager,
-    navController   : NavController
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(32.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.5f)), RoundedCornerShape(32.dp))
-    ) {
-        Column(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier         = Modifier
-                        .size(48.dp)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(0.06f), RoundedCornerShape(14.dp))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(0.4f)), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f), modifier = Modifier.size(26.dp)) }
-
-                Surface(
-                    modifier = Modifier.align(Alignment.TopEnd),
-                    shape    = RoundedCornerShape(50),
-                    color    = MaterialTheme.colorScheme.secondaryContainer
-                ) {
-                    Text(
-                        text       = "Soon",
-                        fontSize   = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier   = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                    )
-                }
-            }
-
-            Text(
-                stringResource(R.string.home_fps_monitor_title),
-                fontWeight = FontWeight.Bold,
-                fontSize   = 14.sp,
-                color      = MaterialTheme.colorScheme.onSurface.copy(0.45f)
-            )
-
-            Text(
-                stringResource(R.string.home_show_fps),
-                fontSize   = 11.sp,
-                color      = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
-                lineHeight = 15.sp
-            )
-
-            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outlineVariant.copy(0.5f), modifier = Modifier.size(18.dp))
-            }
-        }
-    }
-}
-
-
-
