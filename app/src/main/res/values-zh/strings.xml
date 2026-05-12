@@ -895,27 +895,58 @@
 <string name="payment_sociabuzz_desc">适用于国际用户 · 信用卡、PayPal、全球支付方式</string>
 <string name="payment_recommended">推荐</string>
 <string name="payment_auto_message_info">捐款留言已自动填写，请勿更改，以便自动激活高级版。</string>
-<string name="freeform_label">悬浮窗口</string>
-    <string name="freeform_title">自由窗口模式</string>
-    <string name="freeform_desc">将任意应用以可拖动、可调整大小的悬浮窗运行</string>
-    <string name="freeform_no_access">无访问权限</string>
-    <string name="freeform_toggle_desc">全局启用或禁用 Android 自由窗口支持</string>
-    <string name="freeform_status_on">自由窗口：已启用</string>
-    <string name="freeform_status_off">自由窗口：已禁用</string>
-    <string name="freeform_enabled_ok">自由窗口模式已成功启用</string>
-    <string name="freeform_disabled_ok">自由窗口模式已成功禁用</string>
-    <string name="freeform_failed">更改自由窗口状态失败</string>
-    <string name="freeform_window_size_title">窗口大小预设</string>
-    <string name="freeform_size_small">小</string>
-    <string name="freeform_size_medium">中</string>
-    <string name="freeform_size_large">大</string>
-    <string name="freeform_size_hint">在悬浮窗启动应用前，请先选择窗口大小</string>
-    <string name="freeform_launch_title">在悬浮窗中启动应用</string>
-    <string name="freeform_pkg_hint">应用包名（例如：com.example.app）</string>
-    <string name="freeform_launch_btn">在窗口中启动</string>
-    <string name="freeform_launch_ok">应用已在悬浮窗中成功启动</string>
-    <string name="freeform_launch_failed">启动失败，请检查包名或先启用自由窗口模式</string>
-    <string name="freeform_launch_requires_enabled">请先启用自由窗口模式再启动应用</string>
-    <string name="freeform_tip">提示：启动后，可拖动标题栏移动窗口，拖动边缘调整窗口大小</string>
+    <string name="monitor_title">系统监控</string>
+
+    <!-- Section labels -->
+    <string name="section_cpu">CPU 监控</string>
+    <string name="section_gpu">GPU 监控</string>
+    <string name="section_ram">内存监控</string>
+    <string name="section_storage">存储</string>
+
+    <!-- Access level chips -->
+    <string name="access_root">Root</string>
+    <string name="access_shizuku">Shizuku</string>
+    <string name="access_shell">Shell</string>
+
+    <!-- GPU card -->
+    <string name="gpu_no_signal">无信号</string>
+    <string name="gpu_collecting">正在收集数据…</string>
+    <string name="gpu_chip_frequency">频率</string>
+    <string name="gpu_chip_backend">后端</string>
+    <string name="gpu_chip_access">权限</string>
+    <string name="gpu_freq_range">频率范围</string>
+
+    <!-- RAM card -->
+    <string name="ram_used_of">已使用 %1$s，共 %2$s</string>
+    <string name="ram_stat_used">已使用</string>
+    <string name="ram_stat_available">可用</string>
+    <string name="ram_stat_total">总计</string>
+    <string name="ram_stat_cached">缓存</string>
+
+    <!-- Storage card -->
+    <string name="storage_used_of">已使用 %1$s，共 %2$s</string>
+    <string name="storage_stat_used">已使用</string>
+    <string name="storage_stat_free">可用</string>
+    <string name="storage_stat_total">总计</string>
+    <string name="storage_stat_type">类型</string>
+
+    <!-- Health check button -->
+    <string name="storage_health_check_btn">%1$s 健康检测</string>
+    <string name="storage_health_checking">检测中…</string>
+    <string name="storage_health_reading">正在读取存储健康数据…</string>
+    <string name="storage_health_not_available">此设备不支持健康数据读取</string>
+
+    <!-- Health result -->
+    <string name="storage_health_label">%1$s 健康状态</string>
+    <string name="storage_health_slot_a">槽 A</string>
+    <string name="storage_health_slot_b">槽 B</string>
+    <string name="storage_health_overall">综合评分</string>
+    <string name="storage_health_na">不适用</string>
+
+    <!-- Health status -->
+    <string name="health_status_healthy">健康</string>
+    <string name="health_status_caution">注意</string>
+    <string name="health_status_critical">严重</string>
+    <string name="health_status_unknown">未知</string>
 
 </resources>

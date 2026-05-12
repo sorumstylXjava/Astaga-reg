@@ -898,26 +898,57 @@
 <string name="payment_recommended">Rekomendasi</string>
 <string name="payment_auto_message_info">Pesan donasi sudah terisi otomatis. Jangan ubah isi pesan agar premium bisa aktif otomatis.</string>
 <string name="payment_sheet_package">Paket: %s</string>
-    <string name="freeform_label">Jendela Mengambang</string>
-    <string name="freeform_title">Mode Freeform</string>
-    <string name="freeform_desc">Jalankan aplikasi apa saja di jendela kecil yang bisa digeser dan diubah ukurannya</string>
-    <string name="freeform_no_access">TIDAK ADA AKSES</string>
-    <string name="freeform_toggle_desc">Aktifkan atau nonaktifkan dukungan freeform Android secara global</string>
-    <string name="freeform_status_on">Freeform: Aktif</string>
-    <string name="freeform_status_off">Freeform: Tidak Aktif</string>
-    <string name="freeform_enabled_ok">Mode freeform berhasil diaktifkan</string>
-    <string name="freeform_disabled_ok">Mode freeform berhasil dinonaktifkan</string>
-    <string name="freeform_failed">Gagal mengubah status freeform</string>
-    <string name="freeform_window_size_title">Preset Ukuran Jendela</string>
-    <string name="freeform_size_small">Kecil</string>
-    <string name="freeform_size_medium">Sedang</string>
-    <string name="freeform_size_large">Besar</string>
-    <string name="freeform_size_hint">Pilih ukuran sebelum membuka aplikasi di jendela mengambang</string>
-    <string name="freeform_launch_title">Buka Aplikasi di Jendela Mengambang</string>
-    <string name="freeform_pkg_hint">Nama paket aplikasi (cth: com.example.app)</string>
-    <string name="freeform_launch_btn">Buka di Jendela</string>
-    <string name="freeform_launch_ok">Aplikasi berhasil dibuka di jendela mengambang</string>
-    <string name="freeform_launch_failed">Gagal membuka. Periksa nama paket atau aktifkan freeform terlebih dahulu</string>
-    <string name="freeform_launch_requires_enabled">Aktifkan mode freeform terlebih dahulu sebelum membuka aplikasi</string>
-    <string name="freeform_tip">Tips: Setelah dibuka, seret title bar untuk memindahkan jendela dan seret sudutnya untuk mengubah ukuran</string>
+  <string name="monitor_title">System Monitor</string>
+
+    <!-- Section labels -->
+    <string name="section_cpu">CPU MONITOR</string>
+    <string name="section_gpu">GPU MONITOR</string>
+    <string name="section_ram">RAM MONITOR</string>
+    <string name="section_storage">STORAGE</string>
+
+    <!-- Access level chips -->
+    <string name="access_root">Root</string>
+    <string name="access_shizuku">Shizuku</string>
+    <string name="access_shell">Shell</string>
+
+    <!-- GPU card -->
+    <string name="gpu_no_signal">Tidak ada sinyal</string>
+    <string name="gpu_collecting">Mengumpulkan data…</string>
+    <string name="gpu_chip_frequency">FREKUENSI</string>
+    <string name="gpu_chip_backend">BACKEND</string>
+    <string name="gpu_chip_access">AKSES</string>
+    <string name="gpu_freq_range">RENTANG FREQ</string>
+
+    <!-- RAM card -->
+    <string name="ram_used_of">%1$s digunakan dari %2$s</string>
+    <string name="ram_stat_used">DIGUNAKAN</string>
+    <string name="ram_stat_available">TERSEDIA</string>
+    <string name="ram_stat_total">TOTAL</string>
+    <string name="ram_stat_cached">CACHE</string>
+
+    <!-- Storage card -->
+    <string name="storage_used_of">%1$s digunakan dari %2$s</string>
+    <string name="storage_stat_used">DIGUNAKAN</string>
+    <string name="storage_stat_free">BEBAS</string>
+    <string name="storage_stat_total">TOTAL</string>
+    <string name="storage_stat_type">TIPE</string>
+
+    <!-- Health check button -->
+    <string name="storage_health_check_btn">%1$s Health Check</string>
+    <string name="storage_health_checking">Memeriksa…</string>
+    <string name="storage_health_reading">Membaca data kesehatan storage…</string>
+    <string name="storage_health_not_available">Data kesehatan tidak tersedia di perangkat ini</string>
+
+    <!-- Health result -->
+    <string name="storage_health_label">%1$s HEALTH</string>
+    <string name="storage_health_slot_a">SLOT A</string>
+    <string name="storage_health_slot_b">SLOT B</string>
+    <string name="storage_health_overall">OVERALL</string>
+    <string name="storage_health_na">N/A</string>
+
+    <!-- Health status -->
+    <string name="health_status_healthy">HEALTHY</string>
+    <string name="health_status_caution">CAUTION</string>
+    <string name="health_status_critical">CRITICAL</string>
+    <string name="health_status_unknown">UNKNOWN</string>
 </resources>

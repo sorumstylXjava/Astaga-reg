@@ -897,26 +897,57 @@
 <string name="payment_sociabuzz_desc">For international users · Credit card, PayPal, global methods</string>
 <string name="payment_recommended">Recommended</string>
 <string name="payment_auto_message_info">Donation message is pre-filled automatically. Do not change it so premium can be activated automatically.</string>
-<string name="freeform_label">Freeform Window</string>
-    <string name="freeform_title">Freeform Mode</string>
-    <string name="freeform_desc">Float any app in a resizable, draggable window</string>
-    <string name="freeform_no_access">NO ACCESS</string>
-    <string name="freeform_toggle_desc">Enable or disable Android freeform support globally</string>
-    <string name="freeform_status_on">Freeform: Active</string>
-    <string name="freeform_status_off">Freeform: Inactive</string>
-    <string name="freeform_enabled_ok">Freeform mode enabled successfully</string>
-    <string name="freeform_disabled_ok">Freeform mode disabled successfully</string>
-    <string name="freeform_failed">Failed to change freeform state</string>
-    <string name="freeform_window_size_title">Window Size Preset</string>
-    <string name="freeform_size_small">Small</string>
-    <string name="freeform_size_medium">Medium</string>
-    <string name="freeform_size_large">Large</string>
-    <string name="freeform_size_hint">Select a size before launching the app in a floating window</string>
-    <string name="freeform_launch_title">Launch App in Floating Window</string>
-    <string name="freeform_pkg_hint">Package name (e.g. com.example.app)</string>
-    <string name="freeform_launch_btn">Launch in Window</string>
-    <string name="freeform_launch_ok">App launched in freeform window</string>
-    <string name="freeform_launch_failed">Failed to launch. Check package name or enable freeform first</string>
-    <string name="freeform_launch_requires_enabled">Enable freeform mode first before launching an app</string>
-    <string name="freeform_tip">Tip: After launch, you can drag the title bar to move the window and pinch the edges to resize it</string>
+    <string name="monitor_title">System Monitor</string>
+
+    <!-- Section labels -->
+    <string name="section_cpu">CPU MONITOR</string>
+    <string name="section_gpu">GPU MONITOR</string>
+    <string name="section_ram">RAM MONITOR</string>
+    <string name="section_storage">STORAGE</string>
+
+    <!-- Access level chips -->
+    <string name="access_root">Root</string>
+    <string name="access_shizuku">Shizuku</string>
+    <string name="access_shell">Shell</string>
+
+    <!-- GPU card -->
+    <string name="gpu_no_signal">No signal</string>
+    <string name="gpu_collecting">Collecting data…</string>
+    <string name="gpu_chip_frequency">FREQUENCY</string>
+    <string name="gpu_chip_backend">BACKEND</string>
+    <string name="gpu_chip_access">ACCESS</string>
+    <string name="gpu_freq_range">FREQ RANGE</string>
+
+    <!-- RAM card -->
+    <string name="ram_used_of">%1$s used of %2$s</string>
+    <string name="ram_stat_used">USED</string>
+    <string name="ram_stat_available">AVAILABLE</string>
+    <string name="ram_stat_total">TOTAL</string>
+    <string name="ram_stat_cached">CACHED</string>
+
+    <!-- Storage card -->
+    <string name="storage_used_of">%1$s used of %2$s</string>
+    <string name="storage_stat_used">USED</string>
+    <string name="storage_stat_free">FREE</string>
+    <string name="storage_stat_total">TOTAL</string>
+    <string name="storage_stat_type">TYPE</string>
+
+    <!-- Health check button -->
+    <string name="storage_health_check_btn">%1$s Health Check</string>
+    <string name="storage_health_checking">Checking…</string>
+    <string name="storage_health_reading">Reading storage health data…</string>
+    <string name="storage_health_not_available">Health data not available on this device</string>
+
+    <!-- Health result -->
+    <string name="storage_health_label">%1$s HEALTH</string>
+    <string name="storage_health_slot_a">SLOT A</string>
+    <string name="storage_health_slot_b">SLOT B</string>
+    <string name="storage_health_overall">OVERALL</string>
+    <string name="storage_health_na">N/A</string>
+
+    <!-- Health status -->
+    <string name="health_status_healthy">HEALTHY</string>
+    <string name="health_status_caution">CAUTION</string>
+    <string name="health_status_critical">CRITICAL</string>
+    <string name="health_status_unknown">UNKNOWN</string>
 </resources>

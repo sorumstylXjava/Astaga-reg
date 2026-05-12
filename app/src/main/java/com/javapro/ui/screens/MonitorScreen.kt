@@ -312,15 +312,18 @@ private object StorageTypeCache {
 private fun detectStorageType(): String {
     StorageTypeCache.type?.let { return it }
     val detected = when {
-        File("/sys/block/sda").exists() -> {
-            val vendor = try { File("/sys/block/sda/device/vendor").readText().trim() } catch (_: Exception) { "" }
-            val model  = try { File("/sys/block/sda/device/model").readText().trim() } catch (_: Exception) { "" }
-            val rev    = try { File("/sys/block/sda/device/rev").readText().trim() } catch (_: Exception) { "" }
-            if (vendor.isNotEmpty() || model.isNotEmpty() || rev.isNotEmpty()) "UFS" else "Unknown"
-        }
-        try { File("/proc/scsi/scsi").readText().contains("UFS", ignoreCase = true) } catch (_: Exception) { false } -> "UFS"
+        File("/sys/block/sda").exists() -> "UFS"
         File("/sys/class/block/sda").exists() -> "UFS"
+        try {
+            File("/sys/bus/platform/drivers/ufshcd").exists() ||
+            File("/sys/bus/platform/drivers/ufshcd-pltfrm").exists()
+        } catch (_: Exception) { false } -> "UFS"
+        try {
+            File("/sys/class/scsi_disk").listFiles()?.any { it.name.startsWith("0:0:0") } == true
+        } catch (_: Exception) { false } -> "UFS"
+        try { File("/proc/scsi/scsi").readText().contains("UFS", ignoreCase = true) } catch (_: Exception) { false } -> "UFS"
         File("/sys/block/mmcblk0").exists() -> "eMMC"
+        File("/sys/class/block/mmcblk0").exists() -> "eMMC"
         else -> "Unknown"
     }
     StorageTypeCache.type = detected
@@ -538,10 +541,12 @@ fun MonitorScreen(
     var gpuHistory  by remember { mutableStateOf(listOf<Float>()) }
     var gpuName     by remember { mutableStateOf("—") }
 
-    var ramInfo     by remember { mutableStateOf(RamInfo(0, 0, 0, 0)) }
-    var battTempC   by remember { mutableStateOf(-1f) }
-    var storageInfo by remember { mutableStateOf(StorageInfo(0f, 0f, 0f, "—")) }
-    var storageHealth by remember { mutableStateOf<StorageHealth?>(null) }
+    var ramInfo        by remember { mutableStateOf(RamInfo(0, 0, 0, 0)) }
+    var battTempC      by remember { mutableStateOf(-1f) }
+    var storageInfo    by remember { mutableStateOf(StorageInfo(0f, 0f, 0f, "—")) }
+    var storageHealth  by remember { mutableStateOf<StorageHealth?>(null) }
+    var healthChecking by remember { mutableStateOf(false) }
+    var healthExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         var prevSnap: CpuStatSnapshot? = null
@@ -611,15 +616,12 @@ fun MonitorScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            storageHealth = readStorageHealth()
-        }
-        while (true) {
-            delay(30_000)
+    LaunchedEffect(healthChecking) {
+        if (healthChecking) {
             withContext(Dispatchers.IO) {
                 storageHealth = readStorageHealth()
             }
+            healthChecking = false
         }
     }
 
@@ -687,9 +689,17 @@ fun MonitorScreen(
 
             MonitorSectionLabel("STORAGE")
             StorageMonitorCard(
-                info        = storageInfo,
-                health      = storageHealth,
-                accentColor = MaterialTheme.colorScheme.primary
+                info           = storageInfo,
+                health         = storageHealth,
+                healthChecking = healthChecking,
+                healthExpanded = healthExpanded,
+                onCheckHealth  = {
+                    if (!healthChecking) {
+                        healthChecking = true
+                        healthExpanded = true
+                    }
+                },
+                accentColor    = MaterialTheme.colorScheme.primary
             )
 
             Spacer(Modifier.height(16.dp))
@@ -1169,9 +1179,12 @@ private fun RamMonitorCard(
 
 @Composable
 private fun StorageMonitorCard(
-    info        : StorageInfo,
-    health      : StorageHealth?,
-    accentColor : Color
+    info           : StorageInfo,
+    health         : StorageHealth?,
+    healthChecking : Boolean,
+    healthExpanded : Boolean,
+    onCheckHealth  : () -> Unit,
+    accentColor    : Color
 ) {
     val usedPct = if (info.totalGb > 0) info.usedGb / info.totalGb * 100f else 0f
     val animPct by animateFloatAsState(usedPct, tween(500), label = "stPct")
@@ -1194,10 +1207,10 @@ private fun StorageMonitorCard(
                 Surface(shape = RoundedCornerShape(50), color = accentColor.copy(0.13f)) {
                     Text(
                         info.type,
-                        fontSize   = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color      = accentColor,
-                        modifier   = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        fontSize      = 9.sp,
+                        fontWeight    = FontWeight.ExtraBold,
+                        color         = accentColor,
+                        modifier      = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                         letterSpacing = 0.5.sp
                     )
                 }
@@ -1227,73 +1240,78 @@ private fun StorageMonitorCard(
             color = accentColor
         )
 
-        if (health != null) {
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.35f))
-            Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.35f))
+        Spacer(Modifier.height(10.dp))
 
+        Surface(
+            modifier  = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(12.dp),
+            color     = accentColor.copy(0.10f),
+            border    = BorderStroke(0.8.dp, accentColor.copy(0.30f)),
+            onClick   = { if (!healthChecking) onCheckHealth() }
+        ) {
             Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier              = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Text(
-                    "${health.type} HEALTH",
-                    fontSize      = 9.sp,
-                    fontWeight    = FontWeight.ExtraBold,
-                    letterSpacing = 0.8.sp,
-                    color         = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (health.tempC != null) {
-                    val tempColor = if (health.tempC > 55) MaterialTheme.colorScheme.error else accentColor
-                    Surface(shape = RoundedCornerShape(50), color = tempColor.copy(0.13f)) {
-                        Text(
-                            "${health.tempC}°C",
-                            fontSize   = 9.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color      = tempColor,
-                            modifier   = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                        )
-                    }
+                if (healthChecking) {
+                    CircularProgressIndicator(
+                        modifier  = Modifier.size(14.dp),
+                        color     = accentColor,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Checking…",
+                        fontSize   = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = accentColor
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint     = accentColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "${info.type} Health Check",
+                        fontSize   = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = accentColor
+                    )
                 }
             }
+        }
 
-            Spacer(Modifier.height(10.dp))
+        if (healthExpanded) {
+            Spacer(Modifier.height(12.dp))
 
-            if (!health.isSupported) {
-                Text(
-                    "Health data tidak tersedia di device ini",
-                    fontSize = 11.sp,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                val overallColor = when (health.overallStatus) {
-                    "HEALTHY"  -> accentColor
-                    "CAUTION"  -> MaterialTheme.colorScheme.tertiary
-                    "CRITICAL" -> MaterialTheme.colorScheme.error
-                    else       -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-
+            if (healthChecking || health == null) {
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    StorageHealthSlotCard(
-                        label       = "SLOT A",
-                        hex         = health.slotA,
-                        pct         = health.slotAPct,
-                        accentColor = accentColor,
-                        modifier    = Modifier.weight(1f)
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(18.dp),
+                        color       = accentColor,
+                        strokeWidth = 2.dp
                     )
-                    StorageHealthSlotCard(
-                        label       = "SLOT B",
-                        hex         = health.slotB,
-                        pct         = health.slotBPct,
-                        accentColor = accentColor,
-                        modifier    = Modifier.weight(1f)
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Reading storage health data…",
+                        fontSize = 12.sp,
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
+            } else {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.35f))
                 Spacer(Modifier.height(10.dp))
 
                 Row(
@@ -1301,34 +1319,99 @@ private fun StorageMonitorCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("OVERALL", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
-                        Text(
-                            if (health.overallPct != null) "${health.overallPct}%" else "N/A",
-                            fontSize   = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color      = overallColor
-                        )
-                    }
-                    Surface(
-                        shape  = RoundedCornerShape(10.dp),
-                        color  = overallColor.copy(0.13f),
-                        border = BorderStroke(0.7.dp, overallColor.copy(0.3f))
-                    ) {
-                        Text(
-                            health.overallStatus,
-                            fontSize      = 11.sp,
-                            fontWeight    = FontWeight.ExtraBold,
-                            color         = overallColor,
-                            letterSpacing = 0.5.sp,
-                            modifier      = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                    Text(
+                        "${health.type} HEALTH",
+                        fontSize      = 9.sp,
+                        fontWeight    = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp,
+                        color         = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (health.tempC != null) {
+                        val tempColor = if (health.tempC > 55) MaterialTheme.colorScheme.error else accentColor
+                        Surface(shape = RoundedCornerShape(50), color = tempColor.copy(0.13f)) {
+                            Text(
+                                "${health.tempC}°C",
+                                fontSize   = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color      = tempColor,
+                                modifier   = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
-                if (health.overallPct != null) {
-                    Spacer(Modifier.height(8.dp))
-                    UsageProgressBar(health.overallPct / 100f, overallColor, height = 5)
+                Spacer(Modifier.height(10.dp))
+
+                if (!health.isSupported) {
+                    Text(
+                        "Health data not available on this device",
+                        fontSize = 11.sp,
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    val overallColor = when (health.overallStatus) {
+                        "HEALTHY"  -> accentColor
+                        "CAUTION"  -> MaterialTheme.colorScheme.tertiary
+                        "CRITICAL" -> MaterialTheme.colorScheme.error
+                        else       -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        StorageHealthSlotCard(
+                            label       = "SLOT A",
+                            hex         = health.slotA,
+                            pct         = health.slotAPct,
+                            accentColor = accentColor,
+                            modifier    = Modifier.weight(1f)
+                        )
+                        StorageHealthSlotCard(
+                            label       = "SLOT B",
+                            hex         = health.slotB,
+                            pct         = health.slotBPct,
+                            accentColor = accentColor,
+                            modifier    = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("OVERALL", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+                            Text(
+                                if (health.overallPct != null) "${health.overallPct}%" else "N/A",
+                                fontSize   = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color      = overallColor
+                            )
+                        }
+                        Surface(
+                            shape  = RoundedCornerShape(10.dp),
+                            color  = overallColor.copy(0.13f),
+                            border = BorderStroke(0.7.dp, overallColor.copy(0.3f))
+                        ) {
+                            Text(
+                                health.overallStatus,
+                                fontSize      = 11.sp,
+                                fontWeight    = FontWeight.ExtraBold,
+                                color         = overallColor,
+                                letterSpacing = 0.5.sp,
+                                modifier      = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+
+                    if (health.overallPct != null) {
+                        Spacer(Modifier.height(8.dp))
+                        UsageProgressBar(health.overallPct / 100f, overallColor, height = 5)
+                    }
                 }
             }
         }

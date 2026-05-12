@@ -898,26 +898,57 @@
 <string name="payment_sociabuzz_desc">अंतर्राष्ट्रीय उपयोगकर्ताओं के लिए · क्रेडिट कार्ड, PayPal, वैश्विक तरीके</string>
 <string name="payment_recommended">अनुशंसित</string>
 <string name="payment_auto_message_info">डोनेशन संदेश स्वचालित रूप से भरा गया है। प्रीमियम स्वचालित रूप से सक्रिय करने के लिए इसे न बदलें।</string>
-    <string name="freeform_label">फ्लोटिंग विंडो</string>
-    <string name="freeform_title">फ्रीफॉर्म मोड</string>
-    <string name="freeform_desc">किसी भी ऐप को एक छोटी, खींचने योग्य और आकार बदलने योग्य विंडो में चलाएं</string>
-    <string name="freeform_no_access">कोई पहुँच नहीं</string>
-    <string name="freeform_toggle_desc">Android फ्रीफॉर्म सपोर्ट को वैश्विक रूप से सक्षम या अक्षम करें</string>
-    <string name="freeform_status_on">फ्रीफॉर्म: सक्रिय</string>
-    <string name="freeform_status_off">फ्रीफॉर्म: निष्क्रिय</string>
-    <string name="freeform_enabled_ok">फ्रीफॉर्म मोड सफलतापूर्वक सक्षम किया गया</string>
-    <string name="freeform_disabled_ok">फ्रीफॉर्म मोड सफलतापूर्वक अक्षम किया गया</string>
-    <string name="freeform_failed">फ्रीफॉर्म स्थिति बदलने में विफल</string>
-    <string name="freeform_window_size_title">विंडो आकार प्रीसेट</string>
-    <string name="freeform_size_small">छोटा</string>
-    <string name="freeform_size_medium">मध्यम</string>
-    <string name="freeform_size_large">बड़ा</string>
-    <string name="freeform_size_hint">फ्लोटिंग विंडो में ऐप खोलने से पहले एक आकार चुनें</string>
-    <string name="freeform_launch_title">फ्लोटिंग विंडो में ऐप खोलें</string>
-    <string name="freeform_pkg_hint">पैकेज नाम (उदा. com.example.app)</string>
-    <string name="freeform_launch_btn">विंडो में खोलें</string>
-    <string name="freeform_launch_ok">ऐप फ्रीफॉर्म विंडो में खुला</string>
-    <string name="freeform_launch_failed">खोलने में विफल। पैकेज नाम जाँचें या पहले फ्रीफॉर्म सक्षम करें</string>
-    <string name="freeform_launch_requires_enabled">ऐप खोलने से पहले फ्रीफॉर्म मोड सक्षम करें</string>
-    <string name="freeform_tip">सुझाव: खुलने के बाद, विंडो को हिलाने के लिए टाइटल बार को खींचें और आकार बदलने के लिए किनारे खींचें</string>
+    <string name="monitor_title">सिस्टम मॉनिटर</string>
+
+    <!-- Section labels -->
+    <string name="section_cpu">CPU मॉनिटर</string>
+    <string name="section_gpu">GPU मॉनिटर</string>
+    <string name="section_ram">RAM मॉनिटर</string>
+    <string name="section_storage">स्टोरेज</string>
+
+    <!-- Access level chips -->
+    <string name="access_root">रूट</string>
+    <string name="access_shizuku">Shizuku</string>
+    <string name="access_shell">शेल</string>
+
+    <!-- GPU card -->
+    <string name="gpu_no_signal">कोई सिग्नल नहीं</string>
+    <string name="gpu_collecting">डेटा एकत्र हो रहा है…</string>
+    <string name="gpu_chip_frequency">आवृत्ति</string>
+    <string name="gpu_chip_backend">बैकएंड</string>
+    <string name="gpu_chip_access">एक्सेस</string>
+    <string name="gpu_freq_range">FREQ रेंज</string>
+
+    <!-- RAM card -->
+    <string name="ram_used_of">%2$s में से %1$s उपयोग हो रहा है</string>
+    <string name="ram_stat_used">उपयोग</string>
+    <string name="ram_stat_available">उपलब्ध</string>
+    <string name="ram_stat_total">कुल</string>
+    <string name="ram_stat_cached">कैश</string>
+
+    <!-- Storage card -->
+    <string name="storage_used_of">%2$s में से %1$s उपयोग हो रहा है</string>
+    <string name="storage_stat_used">उपयोग</string>
+    <string name="storage_stat_free">खाली</string>
+    <string name="storage_stat_total">कुल</string>
+    <string name="storage_stat_type">प्रकार</string>
+
+    <!-- Health check button -->
+    <string name="storage_health_check_btn">%1$s स्वास्थ्य जाँच</string>
+    <string name="storage_health_checking">जाँच हो रही है…</string>
+    <string name="storage_health_reading">स्टोरेज स्वास्थ्य डेटा पढ़ा जा रहा है…</string>
+    <string name="storage_health_not_available">इस डिवाइस पर स्वास्थ्य डेटा उपलब्ध नहीं है</string>
+
+    <!-- Health result -->
+    <string name="storage_health_label">%1$s स्वास्थ्य</string>
+    <string name="storage_health_slot_a">स्लॉट A</string>
+    <string name="storage_health_slot_b">स्लॉट B</string>
+    <string name="storage_health_overall">समग्र</string>
+    <string name="storage_health_na">उपलब्ध नहीं</string>
+
+    <!-- Health status -->
+    <string name="health_status_healthy">स्वस्थ</string>
+    <string name="health_status_caution">सावधान</string>
+    <string name="health_status_critical">गंभीर</string>
+    <string name="health_status_unknown">अज्ञात</string>
 </resources>
