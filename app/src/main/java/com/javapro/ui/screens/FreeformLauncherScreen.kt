@@ -92,7 +92,7 @@ fun FreeformLauncherScreen(navController: NavController, lang: String) {
                 val screenH = context.resources.displayMetrics.heightPixels
                 val left    = (screenW - pxW) / 2
                 val top     = (screenH - pxH) / 2
-                val options = ActivityOptions.makeFreeformWindowOptions()
+                val options = ActivityOptions.makeBasic()
                 options.setLaunchBounds(Rect(left, top, left + pxW, top + pxH))
                 context.startActivity(intent, options.toBundle())
             } else {
