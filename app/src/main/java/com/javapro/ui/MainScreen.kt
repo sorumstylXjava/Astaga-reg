@@ -87,7 +87,7 @@ fun MainScreen(
     val context       = LocalContext.current
     var isPremium     by remember { mutableStateOf(PremiumManager.isPremium(context)) }
 
-    val windowSize    = rememberWindowSizeInfo()
+    val windowSize = rememberWindowSizeInfo()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute      = navBackStackEntry?.destination?.route ?: "home"
@@ -343,18 +343,25 @@ private fun NavContent(
         composable("screen_record") { ScreenRecordScreen(navController = navController, lang = lang) }
         composable("battery")       { BatteryScreen(navController = navController, lang = lang) }
         composable("monitor")       { MonitorScreen(navController = navController, prefManager = prefManager) }
-        composable("daily_reward") {
+        composable("coin_reward") {
             val activity = LocalContext.current.findActivity()
-            DailyRewardScreen(
+            val context  = LocalContext.current
+            CoinRewardScreen(
                 navController = navController,
                 onWatchAd     = { onAdStarted, onAdFinished ->
-                    AdManager.showRewardedForDailyReward(
-                        activity = activity,
-                        onStart  = onAdStarted,
-                        onResult = { result -> onAdFinished(result) }
+                    AdManager.showRewardedForCoin(
+                        activity  = activity,
+                        context   = context,
+                        onStart   = onAdStarted,
+                        onResult  = { result -> onAdFinished(result) }
                     )
                 },
-                onGranted     = { navController.popBackStack() },
+                lang = lang
+            )
+        }
+        composable("coin_store") {
+            CoinStoreScreen(
+                navController = navController,
                 lang          = lang
             )
         }

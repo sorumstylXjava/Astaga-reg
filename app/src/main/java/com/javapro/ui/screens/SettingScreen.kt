@@ -46,7 +46,7 @@ import com.javapro.BuildConfig
 import com.javapro.R
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
-import com.javapro.utils.DailyRewardManager
+import com.javapro.utils.CoinManager
 import com.javapro.utils.GoogleAuthManager
 import com.javapro.utils.LocaleHelper
 import com.javapro.utils.PreferenceManager
@@ -266,7 +266,7 @@ fun SettingScreen(pref: PreferenceManager, navController: NavController, lang: S
                 colors    = CardDefaults.cardColors(containerColor = cardColor),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
-                DailyRewardSettingItem(navController = navController)
+                CoinStoreSettingItem(navController = navController)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -733,49 +733,42 @@ private fun LanguagePickerCard(
 }
 
 @Composable
-fun DailyRewardSettingItem(navController: NavController, context: Context = LocalContext.current) {
-    var canClaim   by remember { mutableStateOf(DailyRewardManager.canClaimToday(context)) }
-    var adsWatched by remember { mutableIntStateOf(DailyRewardManager.adsWatchedSession(context)) }
-    val required   = DailyRewardManager.ADS_REQUIRED
+fun CoinStoreSettingItem(navController: NavController, context: Context = LocalContext.current) {
+    var coinBalance by remember { mutableIntStateOf(CoinManager.getCachedBalance(context)) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            canClaim   = DailyRewardManager.canClaimToday(context)
-            adsWatched = DailyRewardManager.adsWatchedSession(context)
-            kotlinx.coroutines.delay(1_000L)
+            coinBalance = CoinManager.getCachedBalance(context)
+            kotlinx.coroutines.delay(5_000L)
         }
     }
 
     if (remember { PremiumManager.isPremium(context) }) return
 
     ListItem(
-        modifier = Modifier.fillMaxWidth().clickable { navController.navigate("daily_reward") },
+        modifier = Modifier.fillMaxWidth().clickable { navController.navigate("coin_store") },
         headlineContent = {
-            Text(text = stringResource(R.string.setting_daily_reward_title), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = "Toko Koin", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         },
         supportingContent = {
             Text(
-                text  = if (canClaim) stringResource(R.string.setting_daily_reward_desc) else stringResource(R.string.reward_title_already),
+                text  = "Tonton iklan, kumpulkan koin, tukar premium",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         leadingContent = {
             Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Filled.CardGiftcard, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Icon(imageVector = Icons.Filled.MonetizationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             }
         },
         trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
-                if (canClaim && adsWatched > 0) {
-                    Badge(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.primary) {
-                        Text(text = "$adsWatched/$required", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    }
-                } else if (canClaim) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Icon(imageVector = Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            if (coinBalance > 0) {
+                Badge(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.primary) {
+                    Text(text = "$coinBalance", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
+            } else {
+                Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
@@ -859,4 +852,66 @@ fun ColorSlider(label: String, value: Float, color: Color, onValueChange: (Float
             modifier      = Modifier.padding(vertical = 4.dp)
         )
     }
+}
+
+@Composable
+fun CoinStoreSettingItem(navController: NavController, context: Context = LocalContext.current) {
+    var coinBalance by remember { mutableIntStateOf(CoinManager.getCachedBalance(context)) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            coinBalance = CoinManager.getCachedBalance(context)
+            delay(5_000L)
+        }
+    }
+
+    if (remember { PremiumManager.isPremium(context) }) return
+
+    ListItem(
+        modifier = Modifier.fillMaxWidth().clickable { navController.navigate("coin_store") },
+        headlineContent = {
+            Text(text = "Toko Koin", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+        },
+        supportingContent = {
+            Text(
+                text  = "Tonton iklan, kumpulkan koin, tukar premium",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        leadingContent = {
+            Box(
+                modifier         = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Filled.MonetizationOn,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.primary,
+                    modifier           = Modifier.size(22.dp)
+                )
+            }
+        },
+        trailingContent = {
+            if (coinBalance > 0) {
+                Badge(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor   = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        text       = "$coinBalance",
+                        style      = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
+    )
 }

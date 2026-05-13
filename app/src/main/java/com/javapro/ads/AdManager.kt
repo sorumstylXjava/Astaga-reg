@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.javapro.ui.screens.AdWatchResult
+import com.javapro.utils.AdWatchValidator
 import com.javapro.utils.PremiumManager
 import com.unity3d.ads.IUnityAdsLoadListener
 import com.unity3d.ads.IUnityAdsShowListener
@@ -32,6 +33,7 @@ object AdManager {
     const val SLOT_EXCLUSIVE    = "slot_exclusive"
     const val SLOT_DAILY_REWARD = "slot_daily_reward"
     const val SLOT_CLOUD_CONFIG = "slot_cloud_config"
+    const val SLOT_COIN_REWARD  = "slot_coin_reward"
 
     var isShowingAd = false
         private set
@@ -261,21 +263,12 @@ object AdManager {
         onCompleted : () -> Unit,
         onSkipped   : () -> Unit
     ) {
-        if (isShowingAd) {
-            onSkipped()
-            return
-        }
+        if (isShowingAd) { onSkipped(); return }
         showReadyAd(
             activity  = activity,
             slot      = SLOT_EXCLUSIVE,
-            onSuccess = {
-                Log.d(TAG, "[exclusive] rewarded completed.")
-                onCompleted()
-            },
-            onFail = {
-                Log.d(TAG, "[exclusive] rewarded unavailable/skipped.")
-                onSkipped()
-            }
+            onSuccess = { Log.d(TAG, "[exclusive] rewarded completed."); onCompleted() },
+            onFail    = { Log.d(TAG, "[exclusive] rewarded unavailable/skipped."); onSkipped() }
         )
     }
 
@@ -285,18 +278,12 @@ object AdManager {
         onCompleted : () -> Unit,
         onSkipped   : () -> Unit
     ) {
-        if (isShowingAd) {
-            onSkipped()
-            return
-        }
+        if (isShowingAd) { onSkipped(); return }
         var adStartTime = 0L
         showReadyAd(
             activity  = activity,
             slot      = SLOT_EXCLUSIVE,
-            onStart   = {
-                adStartTime = System.currentTimeMillis()
-                onStart()
-            },
+            onStart   = { adStartTime = System.currentTimeMillis(); onStart() },
             onSuccess = {
                 val watched = System.currentTimeMillis() - adStartTime
                 if (adStartTime > 0L && watched >= 8_000L) {
@@ -320,28 +307,44 @@ object AdManager {
         )
     }
 
-
     fun showRewardedForDailyReward(
         activity  : Activity,
         onStart   : () -> Unit = {},
         onResult  : (AdWatchResult) -> Unit
     ) {
-        if (isShowingAd) {
-            onResult(AdWatchResult.UNAVAILABLE)
-            return
-        }
+        if (isShowingAd) { onResult(AdWatchResult.UNAVAILABLE); return }
         val userEmail = PremiumManager.getPremiumEmail(activity)
         showReadyAd(
             activity   = activity,
             slot       = SLOT_DAILY_REWARD,
             onStart    = onStart,
             customData = userEmail,
-            onSuccess  = {
-                Log.d(TAG, "[daily_reward] ad completed.")
+            onSuccess  = { Log.d(TAG, "[daily_reward] ad completed."); onResult(AdWatchResult.COMPLETED) },
+            onFail     = { Log.d(TAG, "[daily_reward] ad unavailable."); onResult(AdWatchResult.UNAVAILABLE) }
+        )
+    }
+
+    fun showRewardedForCoin(
+        activity  : Activity,
+        context   : Context,
+        onStart   : () -> Unit = {},
+        onResult  : (AdWatchResult) -> Unit
+    ) {
+        if (isShowingAd) { onResult(AdWatchResult.UNAVAILABLE); return }
+        showReadyAd(
+            activity  = activity,
+            slot      = SLOT_COIN_REWARD,
+            onStart   = {
+                AdWatchValidator.markAdStart(context)
+                onStart()
+            },
+            onSuccess = {
+                Log.d(TAG, "[coin_reward] ad completed.")
                 onResult(AdWatchResult.COMPLETED)
             },
             onFail = {
-                Log.d(TAG, "[daily_reward] ad unavailable.")
+                Log.d(TAG, "[coin_reward] ad unavailable/skipped.")
+                AdWatchValidator.clearAdStart(context)
                 onResult(AdWatchResult.UNAVAILABLE)
             }
         )
@@ -352,26 +355,19 @@ object AdManager {
         onCompleted : () -> Unit,
         onSkipped   : () -> Unit
     ) {
-        if (isShowingAd) {
-            onSkipped()
-            return
-        }
+        if (isShowingAd) { onSkipped(); return }
         showReadyAd(
             activity  = activity,
             slot      = SLOT_CLOUD_CONFIG,
-            onSuccess = {
-                Log.d(TAG, "[cloud_config] rewarded completed.")
-                onCompleted()
-            },
-            onFail = {
-                Log.d(TAG, "[cloud_config] rewarded unavailable/skipped.")
-                onSkipped()
-            }
+            onSuccess = { Log.d(TAG, "[cloud_config] rewarded completed."); onCompleted() },
+            onFail    = { Log.d(TAG, "[cloud_config] rewarded unavailable/skipped."); onSkipped() }
         )
     }
 
     fun isExclusiveSlotReady()   = isAdReady && !isShowingAd
     fun isDailyRewardSlotReady() = isAdReady && !isShowingAd
+    fun isCoinRewardSlotReady()  = isAdReady && !isShowingAd
     fun preloadExclusive()       = preload()
     fun preloadDailyReward()     = preload()
+    fun preloadCoinReward()      = preload()
 }

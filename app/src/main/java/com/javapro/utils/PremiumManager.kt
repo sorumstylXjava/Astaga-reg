@@ -24,13 +24,13 @@ object PremiumManager {
     private val HMAC_SECRET get() = dx(byteArrayOf(0x6B, 0x3B, 0x6F, 0x6A, 0x6D, 0x3E, 0x3F, 0x39, 0x39, 0x69, 0x3F, 0x3B, 0x6B, 0x3C, 0x39, 0x3E, 0x3C, 0x3E, 0x3B, 0x6A, 0x3E, 0x69, 0x6B, 0x68, 0x3C, 0x3B, 0x3C, 0x6E, 0x62, 0x63, 0x3F, 0x6F, 0x6E, 0x3E, 0x69, 0x6E, 0x6F, 0x6D, 0x6A, 0x63, 0x3E, 0x62, 0x3B, 0x68, 0x62, 0x6A, 0x63, 0x39, 0x6D, 0x63, 0x69, 0x3C, 0x3B, 0x62, 0x6A, 0x6B, 0x6E, 0x6E, 0x3E, 0x62, 0x6E, 0x62, 0x39, 0x6A))
     private const val TS_TOLERANCE_MS = 3 * 60 * 1000L
 
-    private const val PREFS_NAME    = "javapro_premium_prefs"
-    private const val KEY_TYPE      = "premium_type"
-    private const val KEY_EXPIRY    = "premium_expiry_ms"
-    private const val KEY_VERIFIED  = "premium_verified"
+    private const val PREFS_NAME     = "javapro_premium_prefs"
+    private const val KEY_TYPE       = "premium_type"
+    private const val KEY_EXPIRY     = "premium_expiry_ms"
+    private const val KEY_VERIFIED   = "premium_verified"
     private const val KEY_LAST_CHECK = "premium_last_check"
-    private const val KEY_EMAIL     = "premium_email"
-    private const val CACHE_TTL_MS  = 5 * 60 * 1000L // 5 menit — supaya revoke cepat kedetect
+    private const val KEY_EMAIL      = "premium_email"
+    private const val CACHE_TTL_MS   = 5 * 60 * 1000L
 
     private val REAL_PREMIUM_TYPES = setOf("permanent", "weekly", "monthly", "yearly")
 
@@ -94,23 +94,14 @@ object PremiumManager {
         return try {
             val receivedSig = json.optString("sig", "")
             if (receivedSig.isEmpty()) return false
-
-            // Rebuild string PERSIS sama dengan server (check.js):
-            // sorted keys, format: {"key":"value","key2":"value2"}
-            val keys = json.keys().asSequence()
-                .filter { it != "sig" }
-                .sorted()
-                .toList()
-
-            val str = keys.joinToString(",") { k ->
+            val keys    = json.keys().asSequence().filter { it != "sig" }.sorted().toList()
+            val str     = keys.joinToString(",") { k ->
                 val v = json.opt(k).toString()
                 buildString { append('"'); append(k); append('"'); append(':'); append('"'); append(v); append('"') }
             }
             val payload  = "{$str}"
             val expected = hmacSha256(HMAC_SECRET, payload)
-
-            receivedSig.length == expected.length &&
-                receivedSig.zip(expected).all { (a, b) -> a == b }
+            receivedSig.length == expected.length && receivedSig.zip(expected).all { (a, b) -> a == b }
         } catch (_: Exception) { false }
     }
 
@@ -120,18 +111,15 @@ object PremiumManager {
         return Math.abs(System.currentTimeMillis() - serverTs) < TS_TOLERANCE_MS
     }
 
-    // ── Status premium ─────────────────────────────────────────────────────────
-
     fun isPremium(context: Context): Boolean {
         val p = prefs(context)
         if (!p.getBoolean(KEY_VERIFIED, false)) return false
         val type   = p.getString(KEY_TYPE, null) ?: return false
         val expiry = p.getLong(KEY_EXPIRY, 0L)
         return when (type) {
-            "permanent"                              -> true
-            "weekly", "monthly", "yearly",
-            "daily_reward"                           -> System.currentTimeMillis() < expiry
-            else                                     -> false
+            "permanent"                                            -> true
+            "weekly", "monthly", "yearly", "coin_reward"          -> System.currentTimeMillis() < expiry
+            else                                                   -> false
         }
     }
 
@@ -153,19 +141,16 @@ object PremiumManager {
     fun getExpiryMs(context: Context): Long =
         prefs(context).getLong(KEY_EXPIRY, 0L)
 
-    /** Email Google yang terdaftar premium (dari server response) */
     fun getPremiumEmail(context: Context): String? =
         prefs(context).getString(KEY_EMAIL, null)
 
     fun invalidateCache(context: Context) {
-        // Reset timestamp saja — supaya checkOnline pasti hit server
         prefs(context).edit().putLong(KEY_LAST_CHECK, 0L).apply()
     }
 
     fun clearCacheAndPremium(context: Context) {
-        // Hapus semua cache premium — dipanggil saat verifikasi server bilang tidak premium
         prefs(context).edit()
-            .putLong(KEY_LAST_CHECK, 0L)
+            .putLong(KEY_LAST_SYNC, 0L)
             .remove(KEY_TYPE)
             .remove(KEY_EXPIRY)
             .remove(KEY_EMAIL)
@@ -173,16 +158,8 @@ object PremiumManager {
             .apply()
     }
 
-    // ── Online check via Google idToken ───────────────────────────────────────
-
-    /**
-     * Cek premium ke server menggunakan Google idToken.
-     * Kalau user belum login Google, return isPremium() dari cache.
-     */
     suspend fun checkOnline(context: Context, forceRefresh: Boolean = false): Boolean =
         withContext(Dispatchers.IO) {
-
-            // Pakai cache kalau belum expired
             if (!forceRefresh) {
                 val lastCheck = prefs(context).getLong(KEY_LAST_CHECK, 0L)
                 if (System.currentTimeMillis() - lastCheck < CACHE_TTL_MS) {
@@ -190,71 +167,48 @@ object PremiumManager {
                 }
             }
 
-            // Ambil idToken dari GoogleAuthManager
-            // Coba silent refresh dulu supaya token selalu fresh
             var user = GoogleAuthManager.silentSignIn(context)
                 ?: GoogleAuthManager.getUser(context)
 
-            if (user == null) {
-                // User belum login Google — tidak bisa cek online
-                return@withContext isPremium(context)
-            }
+            if (user == null) return@withContext isPremium(context)
 
             val requestTs = System.currentTimeMillis()
 
             try {
                 val body = JSONObject().apply {
                     put("idToken", user.idToken)
-                    put("ts", requestTs)
+                    put("ts",      requestTs)
                 }.toString().toRequestBody("application/json".toMediaType())
 
-                val request = Request.Builder()
-                    .url(API_URL)
-                    .post(body)
-                    .build()
-
+                val request = Request.Builder().url(API_URL).post(body).build()
                 val response = httpClient.newCall(request).execute()
                 if (!response.isSuccessful) return@withContext isPremium(context)
 
-                val json = JSONObject(
-                    response.body?.string() ?: return@withContext isPremium(context)
-                )
-
-                if (!verifySignature(json)) return@withContext isPremium(context)
-                if (!verifyTimestamp(json)) return@withContext isPremium(context)
+                val json = JSONObject(response.body?.string() ?: return@withContext isPremium(context))
+                if (!verifySignature(json))  return@withContext isPremium(context)
+                if (!verifyTimestamp(json))  return@withContext isPremium(context)
 
                 val premium = json.optBoolean("premium", false)
                 val type    = json.optString("type", "")
                 val expiry  = json.optLong("expiry", 0L)
                 val email   = json.optString("email", "")
 
-                // Validasi daily_reward tetap pakai local record
-                if (premium && type == "daily_reward") {
-                    val hasLocalRecord = DailyRewardManager.hasValidLocalRecord(context, expiry)
-                    if (!hasLocalRecord) {
-                        saveCache(context, false, null, 0L, null)
-                        return@withContext false
-                    }
-                }
-
                 prefs(context).edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
                 if (!premium) {
-                    // Server bilang tidak premium — hapus cache lokal supaya tidak stale
                     clearCacheAndPremium(context)
                 } else {
                     saveCache(context, premium, type.ifEmpty { null }, expiry, email.ifEmpty { null })
                 }
                 premium
-
             } catch (_: Exception) {
                 isPremium(context)
             }
         }
 
-    fun grantDailyRewardLocally(context: Context, expiryMs: Long) {
+    fun grantCoinRewardLocally(context: Context, packageId: String, expiryMs: Long) {
         prefs(context).edit().apply {
             putBoolean(KEY_VERIFIED, true)
-            putString(KEY_TYPE, "daily_reward")
+            putString(KEY_TYPE, "coin_reward")
             putLong(KEY_EXPIRY, expiryMs)
             apply()
         }
@@ -269,13 +223,7 @@ object PremiumManager {
             .apply()
     }
 
-    private fun saveCache(
-        context   : Context,
-        isPremium : Boolean,
-        type      : String?,
-        expiryMs  : Long,
-        email     : String?,
-    ) {
+    private fun saveCache(context: Context, isPremium: Boolean, type: String?, expiryMs: Long, email: String?) {
         prefs(context).edit().apply {
             putBoolean(KEY_VERIFIED, true)
             if (isPremium && type != null) {
@@ -289,4 +237,6 @@ object PremiumManager {
             apply()
         }
     }
+
+    private const val KEY_LAST_SYNC = "premium_last_check"
 }
