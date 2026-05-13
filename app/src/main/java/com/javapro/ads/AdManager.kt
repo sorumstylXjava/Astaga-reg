@@ -331,21 +331,40 @@ object AdManager {
         onResult  : (AdWatchResult) -> Unit
     ) {
         if (isShowingAd) { onResult(AdWatchResult.UNAVAILABLE); return }
+        var adStartTime = 0L
+        val email      = PremiumManager.getPremiumEmail(context) ?: ""
+        val deviceId   = com.javapro.utils.CoinManager.getDeviceFingerprint(context)
+        val customData = if (email.isNotEmpty()) "$email|$deviceId" else deviceId
         showReadyAd(
-            activity  = activity,
-            slot      = SLOT_COIN_REWARD,
+            activity   = activity,
+            slot       = SLOT_COIN_REWARD,
+            customData = customData,
             onStart   = {
+                adStartTime = System.currentTimeMillis()
                 AdWatchValidator.markAdStart(context)
                 onStart()
             },
             onSuccess = {
-                Log.d(TAG, "[coin_reward] ad completed.")
-                onResult(AdWatchResult.COMPLETED)
+                val watched = System.currentTimeMillis() - adStartTime
+                if (adStartTime > 0L && watched >= 8_000L) {
+                    Log.d(TAG, "[coin_reward] ad completed. watched=${watched}ms")
+                    onResult(AdWatchResult.COMPLETED)
+                } else {
+                    Log.w(TAG, "[coin_reward] ad closed too early. watched=${watched}ms")
+                    AdWatchValidator.clearAdStart(context)
+                    onResult(AdWatchResult.SKIPPED)
+                }
             },
             onFail = {
-                Log.d(TAG, "[coin_reward] ad unavailable/skipped.")
-                AdWatchValidator.clearAdStart(context)
-                onResult(AdWatchResult.UNAVAILABLE)
+                val watched = System.currentTimeMillis() - adStartTime
+                if (adStartTime > 0L && watched >= 8_000L) {
+                    Log.d(TAG, "[coin_reward] closed after 8s, treating as completed.")
+                    onResult(AdWatchResult.COMPLETED)
+                } else {
+                    Log.w(TAG, "[coin_reward] ad unavailable/skipped.")
+                    AdWatchValidator.clearAdStart(context)
+                    onResult(AdWatchResult.UNAVAILABLE)
+                }
             }
         )
     }

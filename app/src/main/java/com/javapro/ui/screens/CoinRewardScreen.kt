@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import com.javapro.BuildConfig
+import com.javapro.utils.CoinManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -306,6 +308,42 @@ fun CoinRewardScreen(
                         Icon(Icons.Default.PlayCircleFilled, null, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(text = "Tonton Iklan", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+
+                    if (BuildConfig.DEBUG) {
+                        OutlinedButton(
+                            onClick  = {
+                                val current = CoinManager.getCachedBalance(context)
+                                val newBal  = current + 50
+                                val prefs   = context.getSharedPreferences("jp_coin_v1", android.content.Context.MODE_PRIVATE)
+                                prefs.edit().putInt("c1b", newBal).apply()
+                                coinBalance = newBal
+                                Toast.makeText(context, "[DEBUG] +50 coin → $newBal", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape    = RoundedCornerShape(16.dp),
+                            colors   = OutlinedButtonDefaults.outlinedButtonColors(contentColor = colorScheme.tertiary),
+                            border   = androidx.compose.foundation.BorderStroke(1.dp, colorScheme.tertiary.copy(alpha = 0.5f))
+                        ) {
+                            Icon(Icons.Default.BugReport, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(text = "[DEBUG] +50 Coin", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick  = {
+                            CoinManager.debugAddCoins(context, 50)
+                            coinBalance = CoinManager.getCachedBalance(context)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape    = RoundedCornerShape(16.dp),
+                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = colorScheme.tertiary),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, colorScheme.tertiary.copy(alpha = 0.5f))
+                    ) {
+                        Icon(Icons.Default.MonetizationOn, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(text = "[TEST] +50 Koin", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
 
                     if (!isNetworkAvailable) {
