@@ -107,6 +107,12 @@ object CoinManager {
             .joinToString("") { "%02x".format(it) }
     }
 
+    private fun buildSig(vararg pairs: Pair<String, String>): String {
+        val payload = "{" + pairs.sortedBy { it.first }
+            .joinToString(",") { (k, v) -> "\"$k\":\"$v\"" } + "}"
+        return hmac(payload)
+    }
+
     private fun verifyHmac(data: String, stored: String?): Boolean {
         if (stored.isNullOrEmpty()) return false
         val expected = hmac(data)
@@ -179,16 +185,22 @@ object CoinManager {
             ?: return@withContext getCachedBalance(context)
 
         try {
-            val ts    = System.currentTimeMillis()
-            val nonce = UUID.randomUUID().toString()
-            val sig   = hmac("${user.email}:balance:$ts:$nonce")
+            val ts       = System.currentTimeMillis()
+            val nonce    = UUID.randomUUID().toString()
+            val deviceId = getDeviceFingerprint(context)
+            val sig      = buildSig(
+                "deviceId" to deviceId,
+                "idToken"  to user.idToken,
+                "nonce"    to nonce,
+                "ts"       to ts.toString(),
+            )
 
             val body = JSONObject().apply {
-                put("idToken",       user.idToken)
-                put("ts",            ts)
-                put("nonce",         nonce)
-                put("sig",           sig)
-                put("deviceId",      getDeviceFingerprint(context))
+                put("idToken",  user.idToken)
+                put("ts",       ts)
+                put("nonce",    nonce)
+                put("sig",      sig)
+                put("deviceId", deviceId)
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
@@ -220,17 +232,25 @@ object CoinManager {
         if (!AdWatchValidator.isAdDurationValid(context)) return@withContext EarnResult.AdFraudDetected
 
         try {
-            val ts    = System.currentTimeMillis()
-            val nonce = UUID.randomUUID().toString()
-            val sig   = hmac("${user.email}:earn:$ts:$nonce")
+            val ts         = System.currentTimeMillis()
+            val nonce      = UUID.randomUUID().toString()
+            val deviceId   = getDeviceFingerprint(context)
+            val adStartMs  = AdWatchValidator.getAdStartMs(context)
+            val sig        = buildSig(
+                "adStartMs" to adStartMs.toString(),
+                "deviceId"  to deviceId,
+                "idToken"   to user.idToken,
+                "nonce"     to nonce,
+                "ts"        to ts.toString(),
+            )
 
             val body = JSONObject().apply {
-                put("idToken",       user.idToken)
-                put("ts",            ts)
-                put("nonce",         nonce)
-                put("sig",           sig)
-                put("deviceId",      getDeviceFingerprint(context))
-                put("adStartMs",     AdWatchValidator.getAdStartMs(context))
+                put("idToken",   user.idToken)
+                put("ts",        ts)
+                put("nonce",     nonce)
+                put("sig",       sig)
+                put("deviceId",  deviceId)
+                put("adStartMs", adStartMs)
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
@@ -278,9 +298,16 @@ object CoinManager {
             ?: return@withContext RedeemResult.NetworkError
 
         try {
-            val ts    = System.currentTimeMillis()
-            val nonce = UUID.randomUUID().toString()
-            val sig   = hmac("${user.email}:redeem:$packageId:$ts:$nonce")
+            val ts       = System.currentTimeMillis()
+            val nonce    = UUID.randomUUID().toString()
+            val deviceId = getDeviceFingerprint(context)
+            val sig      = buildSig(
+                "deviceId"  to deviceId,
+                "idToken"   to user.idToken,
+                "nonce"     to nonce,
+                "packageId" to packageId,
+                "ts"        to ts.toString(),
+            )
 
             val body = JSONObject().apply {
                 put("idToken",   user.idToken)
@@ -288,7 +315,7 @@ object CoinManager {
                 put("ts",        ts)
                 put("nonce",     nonce)
                 put("sig",       sig)
-                put("deviceId",  getDeviceFingerprint(context))
+                put("deviceId",  deviceId)
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
