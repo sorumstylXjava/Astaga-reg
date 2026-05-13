@@ -192,7 +192,7 @@ object CoinManager {
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
-                .url("${COIN_API_BASE}balance")
+                .url("${COIN_API_BASE}coin-balance")
                 .post(body)
                 .build()
 
@@ -203,7 +203,8 @@ object CoinManager {
             if (!verifyServerSignature(json)) return@withContext getCachedBalance(context)
             if (!verifyTimestamp(json))       return@withContext getCachedBalance(context)
 
-            val balance = json.optInt("balance", getCachedBalance(context))
+            val balance = json.optString("balance", getCachedBalance(context).toString()).toIntOrNull()
+                ?: getCachedBalance(context)
             saveCachedBalance(context, balance)
             balance
         } catch (_: Exception) {
@@ -233,7 +234,7 @@ object CoinManager {
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
-                .url("${COIN_API_BASE}earn")
+                .url("${COIN_API_BASE}coin-earn")
                 .post(body)
                 .build()
 
@@ -245,9 +246,9 @@ object CoinManager {
             if (!verifyTimestamp(json))       return@withContext EarnResult.TamperDetected
 
             return@withContext when {
-                json.optBoolean("success", false) -> {
-                    val earned     = json.optInt("coinsEarned", 0)
-                    val newBalance = json.optInt("balance", 0)
+                json.optString("success") == "true" -> {
+                    val earned     = json.optString("coinsEarned", "0").toIntOrNull() ?: 0
+                    val newBalance = json.optString("balance", "0").toIntOrNull() ?: 0
                     saveCachedBalance(context, newBalance)
                     AdWatchValidator.clearAdStart(context)
                     EarnResult.Success(earned, newBalance)
@@ -291,7 +292,7 @@ object CoinManager {
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
-                .url("${COIN_API_BASE}redeem")
+                .url("${COIN_API_BASE}coin-redeem")
                 .post(body)
                 .build()
 
@@ -303,16 +304,16 @@ object CoinManager {
             if (!verifyTimestamp(json))       return@withContext RedeemResult.TamperDetected
 
             return@withContext when {
-                json.optBoolean("success", false) -> {
-                    val expiryMs         = json.optLong("expiryMs", 0L)
-                    val remainingBalance = json.optInt("balance", 0)
+                json.optString("success") == "true" -> {
+                    val expiryMs         = json.optString("expiryMs", "0").toLongOrNull() ?: 0L
+                    val remainingBalance = json.optString("balance", "0").toIntOrNull() ?: 0
                     saveCachedBalance(context, remainingBalance)
                     PremiumManager.grantCoinRewardLocally(context, packageId, expiryMs)
                     RedeemResult.Success(packageId, expiryMs, remainingBalance)
                 }
                 json.optString("reason") == "insufficient_coins" -> {
-                    val required = json.optInt("required", cost)
-                    val current  = json.optInt("balance", currentBalance)
+                    val required = json.optString("required", cost.toString()).toIntOrNull() ?: cost
+                    val current  = json.optString("balance", currentBalance.toString()).toIntOrNull() ?: currentBalance
                     saveCachedBalance(context, current)
                     RedeemResult.InsufficientCoins(required, current)
                 }
@@ -327,5 +328,40 @@ object CoinManager {
 
     fun invalidateCache(context: Context) {
         prefs(context).edit().putLong(KEY_LAST_SYNC_MS, 0L).apply()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  DEBUG ONLY — tidak pernah dipanggil di release build
+    //  Panggil hanya dari blok  if (BuildConfig.DEBUG) { ... }
+    // ─────────────────────────────────────────────────────────────
+
+    /** Tambah koin secara lokal tanpa server. Hanya untuk testing. */
+    fun debugAddCoins(context: Context, amount: Int = 50) {
+        val current = getCachedBalance(context)
+        saveCachedBalance(context, current + amount)
+    }
+
+    /** Tukar paket premium secara lokal tanpa server. Hanya untuk testing. */
+    fun debugRedeemPackage(context: Context, packageId: String): RedeemResult {
+        val cost = when (packageId) {
+            PACKAGE_WEEKLY_ID  -> PACKAGE_WEEKLY_COST
+            PACKAGE_MONTHLY_ID -> PACKAGE_MONTHLY_COST
+            PACKAGE_YEARLY_ID  -> PACKAGE_YEARLY_COST
+            else               -> return RedeemResult.ServerError
+        }
+        val durationMs = when (packageId) {
+            PACKAGE_WEEKLY_ID  -> 7L  * 24 * 60 * 60 * 1000L
+            PACKAGE_MONTHLY_ID -> 30L * 24 * 60 * 60 * 1000L
+            PACKAGE_YEARLY_ID  -> 365L* 24 * 60 * 60 * 1000L
+            else               -> return RedeemResult.ServerError
+        }
+        val current = getCachedBalance(context)
+        if (current < cost) return RedeemResult.InsufficientCoins(cost, current)
+
+        val newBalance = current - cost
+        saveCachedBalance(context, newBalance)
+        val expiryMs = System.currentTimeMillis() + durationMs
+        PremiumManager.grantCoinRewardLocally(context, packageId, expiryMs)
+        return RedeemResult.Success(packageId, expiryMs, newBalance)
     }
 }
