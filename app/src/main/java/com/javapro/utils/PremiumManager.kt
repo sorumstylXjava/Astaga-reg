@@ -214,6 +214,15 @@ object PremiumManager {
         }
     }
 
+    fun grantDailyRewardLocally(context: Context, expiryMs: Long) {
+        prefs(context).edit().apply {
+            putBoolean(KEY_VERIFIED, true)
+            putString(KEY_TYPE, "coin_reward")
+            putLong(KEY_EXPIRY, expiryMs)
+            apply()
+        }
+    }
+
     fun clearPremium(context: Context) {
         prefs(context).edit()
             .remove(KEY_TYPE)
