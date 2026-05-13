@@ -31,7 +31,6 @@ object AdManager {
     const val SLOT_ADVANCED     = "slot_advanced"
     const val SLOT_GENERAL      = "slot_general"
     const val SLOT_EXCLUSIVE    = "slot_exclusive"
-    const val SLOT_DAILY_REWARD = "slot_daily_reward"
     const val SLOT_CLOUD_CONFIG = "slot_cloud_config"
     const val SLOT_COIN_REWARD  = "slot_coin_reward"
 
@@ -307,23 +306,6 @@ object AdManager {
         )
     }
 
-    fun showRewardedForDailyReward(
-        activity  : Activity,
-        onStart   : () -> Unit = {},
-        onResult  : (AdWatchResult) -> Unit
-    ) {
-        if (isShowingAd) { onResult(AdWatchResult.UNAVAILABLE); return }
-        val userEmail = PremiumManager.getPremiumEmail(activity)
-        showReadyAd(
-            activity   = activity,
-            slot       = SLOT_DAILY_REWARD,
-            onStart    = onStart,
-            customData = userEmail,
-            onSuccess  = { Log.d(TAG, "[daily_reward] ad completed."); onResult(AdWatchResult.COMPLETED) },
-            onFail     = { Log.d(TAG, "[daily_reward] ad unavailable."); onResult(AdWatchResult.UNAVAILABLE) }
-        )
-    }
-
     fun showRewardedForCoin(
         activity  : Activity,
         context   : Context,
@@ -383,10 +365,8 @@ object AdManager {
         )
     }
 
-    fun isExclusiveSlotReady()   = isAdReady && !isShowingAd
-    fun isDailyRewardSlotReady() = isAdReady && !isShowingAd
-    fun isCoinRewardSlotReady()  = isAdReady && !isShowingAd
-    fun preloadExclusive()       = preload()
-    fun preloadDailyReward()     = preload()
-    fun preloadCoinReward()      = preload()
+    fun isExclusiveSlotReady()  = isAdReady && !isShowingAd
+    fun isCoinRewardSlotReady() = isAdReady && !isShowingAd
+    fun preloadExclusive()      = preload()
+    fun preloadCoinReward()     = preload()
 }
