@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.getSystemService
 import androidx.navigation.NavController
 import com.javapro.utils.AdWatchValidator
-import com.javapro.utils.CoinManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -322,28 +321,13 @@ fun CoinRewardScreen(
                             },
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape    = RoundedCornerShape(16.dp),
-                            colors   = OutlinedButtonDefaults.outlinedButtonColors(contentColor = colorScheme.tertiary),
+                            colors   = ButtonDefaults.outlinedButtonColors(contentColor = colorScheme.tertiary),
                             border   = androidx.compose.foundation.BorderStroke(1.dp, colorScheme.tertiary.copy(alpha = 0.5f))
                         ) {
                             Icon(Icons.Default.BugReport, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(text = "[DEBUG] +50 Coin", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         }
-                    }
-
-                    OutlinedButton(
-                        onClick  = {
-                            CoinManager.debugAddCoins(context, 50)
-                            coinBalance = CoinManager.getCachedBalance(context)
-                        },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape    = RoundedCornerShape(16.dp),
-                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = colorScheme.tertiary),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, colorScheme.tertiary.copy(alpha = 0.5f))
-                    ) {
-                        Icon(Icons.Default.MonetizationOn, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(text = "[TEST] +50 Koin", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
 
                     if (!isNetworkAvailable) {
