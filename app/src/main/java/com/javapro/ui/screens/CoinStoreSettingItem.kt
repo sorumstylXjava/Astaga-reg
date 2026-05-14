@@ -32,7 +32,16 @@ fun CoinStoreSettingItem(navController: NavController, context: Context = LocalC
         }
     }
 
-    if (remember { PremiumManager.isPremium(context) }) return
+    var isPremium by remember { mutableStateOf(PremiumManager.isPremium(context)) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            isPremium = PremiumManager.isPremium(context)
+            delay(5_000L)
+        }
+    }
+
+    if (isPremium) return
 
     ListItem(
         modifier = Modifier

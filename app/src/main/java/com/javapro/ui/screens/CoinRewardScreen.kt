@@ -5,8 +5,6 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.widget.Toast
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -306,34 +304,6 @@ fun CoinRewardScreen(
                         Icon(Icons.Default.PlayCircleFilled, null, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(text = "Tonton Iklan", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick  = {
-                            scope.launch {
-                                val res = CoinManager.debugUpdateServerBalance(context, "add", 500)
-                                when (res) {
-                                    is CoinManager.DebugCoinResult.Success -> {
-                                        coinBalance = res.newBalance
-                                        Toast.makeText(context, "+500 coin → ${res.newBalance} (Test)", Toast.LENGTH_SHORT).show()
-                                    }
-                                    CoinManager.DebugCoinResult.NoUser ->
-                                        Toast.makeText(context, "Belum login", Toast.LENGTH_SHORT).show()
-                                    CoinManager.DebugCoinResult.NetworkError ->
-                                        Toast.makeText(context, "Koneksi gagal", Toast.LENGTH_SHORT).show()
-                                    CoinManager.DebugCoinResult.ServerError ->
-                                        Toast.makeText(context, "Server error", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape    = RoundedCornerShape(16.dp),
-                        colors   = ButtonDefaults.outlinedButtonColors(contentColor = colorScheme.tertiary),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, colorScheme.tertiary.copy(alpha = 0.5f))
-                    ) {
-                        Icon(Icons.Default.AddCircleOutline, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(text = "Tambah 500 Koin (Test)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
 
                     if (!isNetworkAvailable) {

@@ -19,7 +19,6 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import com.javapro.BuildConfig
 
 object CoinManager {
 
@@ -351,68 +350,5 @@ object CoinManager {
         prefs(context).edit().putLong(KEY_LAST_SYNC_MS, 0L).apply()
     }
 
-    sealed class DebugCoinResult {
-        data class Success(val newBalance: Int) : DebugCoinResult()
-        object NetworkError : DebugCoinResult()
-        object ServerError  : DebugCoinResult()
-        object NoUser       : DebugCoinResult()
-    }
 
-    suspend fun debugUpdateServerBalance(
-        context : Context,
-        action  : String,
-        amount  : Int = 0,
-    ): DebugCoinResult = withContext(Dispatchers.IO) {
-        val user = GoogleAuthManager.silentSignIn(context)
-            ?: GoogleAuthManager.getUser(context)
-            ?: return@withContext DebugCoinResult.NoUser
-
-        try {
-            val body = JSONObject().apply {
-                put("email",       user.email)
-                put("action",      action)
-                put("debugSecret", BuildConfig.DEBUG_SECRET)
-                if (action != "reset") put("amount", amount)
-            }.toString().toRequestBody("application/json".toMediaType())
-
-            val request = Request.Builder()
-                .url("${COIN_API_BASE}coin-debug")
-                .post(body)
-                .build()
-
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext DebugCoinResult.ServerError
-
-            val json       = JSONObject(response.body?.string() ?: return@withContext DebugCoinResult.ServerError)
-            val newBalance = json.optInt("balance", 0)
-            invalidateCache(context)
-            saveCachedBalance(context, newBalance)
-            DebugCoinResult.Success(newBalance)
-        } catch (_: java.net.UnknownHostException)  { DebugCoinResult.NetworkError }
-          catch (_: java.net.SocketTimeoutException) { DebugCoinResult.NetworkError }
-          catch (_: Exception)                       { DebugCoinResult.ServerError  }
-    }
-
-    fun debugRedeemPackage(context: Context, packageId: String): RedeemResult {
-        val cost = when (packageId) {
-            PACKAGE_WEEKLY_ID  -> PACKAGE_WEEKLY_COST
-            PACKAGE_MONTHLY_ID -> PACKAGE_MONTHLY_COST
-            PACKAGE_YEARLY_ID  -> PACKAGE_YEARLY_COST
-            else               -> return RedeemResult.ServerError
-        }
-        val durationMs = when (packageId) {
-            PACKAGE_WEEKLY_ID  -> 7L  * 24 * 60 * 60 * 1000L
-            PACKAGE_MONTHLY_ID -> 30L * 24 * 60 * 60 * 1000L
-            PACKAGE_YEARLY_ID  -> 365L* 24 * 60 * 60 * 1000L
-            else               -> return RedeemResult.ServerError
-        }
-        val current = getCachedBalance(context)
-        if (current < cost) return RedeemResult.InsufficientCoins(cost, current)
-
-        val newBalance = current - cost
-        saveCachedBalance(context, newBalance)
-        val expiryMs = System.currentTimeMillis() + durationMs
-        PremiumManager.grantCoinRewardLocally(context, packageId, expiryMs)
-        return RedeemResult.Success(packageId, expiryMs, newBalance)
-    }
 }
