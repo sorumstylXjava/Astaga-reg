@@ -344,9 +344,45 @@ object CoinManager {
         prefs(context).edit().putLong(KEY_LAST_SYNC_MS, 0L).apply()
     }
 
-    fun debugAddCoins(context: Context, amount: Int = 500) {
-        val current = getCachedBalance(context)
-        saveCachedBalance(context, current + amount)
+    sealed class DebugCoinResult {
+        data class Success(val newBalance: Int) : DebugCoinResult()
+        object NetworkError : DebugCoinResult()
+        object ServerError  : DebugCoinResult()
+        object NoUser       : DebugCoinResult()
+    }
+
+    suspend fun debugUpdateServerBalance(
+        context : Context,
+        action  : String,
+        amount  : Int = 0,
+    ): DebugCoinResult = withContext(Dispatchers.IO) {
+        val user = GoogleAuthManager.silentSignIn(context)
+            ?: GoogleAuthManager.getUser(context)
+            ?: return@withContext DebugCoinResult.NoUser
+
+        try {
+            val body = JSONObject().apply {
+                put("email",  user.email)
+                put("action", action)
+                if (action != "reset") put("amount", amount)
+            }.toString().toRequestBody("application/json".toMediaType())
+
+            val request = Request.Builder()
+                .url("${COIN_API_BASE}coin-debug")
+                .post(body)
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            if (!response.isSuccessful) return@withContext DebugCoinResult.ServerError
+
+            val json       = JSONObject(response.body?.string() ?: return@withContext DebugCoinResult.ServerError)
+            val newBalance = json.optInt("balance", 0)
+            invalidateCache(context)
+            saveCachedBalance(context, newBalance)
+            DebugCoinResult.Success(newBalance)
+        } catch (_: java.net.UnknownHostException)  { DebugCoinResult.NetworkError }
+          catch (_: java.net.SocketTimeoutException) { DebugCoinResult.NetworkError }
+          catch (_: Exception)                       { DebugCoinResult.ServerError  }
     }
 
     fun debugRedeemPackage(context: Context, packageId: String): RedeemResult {

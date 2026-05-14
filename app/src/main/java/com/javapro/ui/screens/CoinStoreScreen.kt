@@ -286,6 +286,9 @@ fun CoinStoreScreen(
             }
 
             if (BuildConfig.DEBUG) {
+                var isDebugLoading by remember { mutableStateOf(false) }
+                var debugMsg       by remember { mutableStateOf("") }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(16.dp),
@@ -298,43 +301,121 @@ fun CoinStoreScreen(
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.BugReport, null, tint = Color(0xFFFFB74D), modifier = Modifier.size(16.dp))
                             Text(
-                                text       = "DEBUG — Tambah Koin",
-                                style      = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color      = Color(0xFFFFB74D)
+                                text  = "DEBUG — Koin Server",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFFFFB74D)
                             )
+                            if (isDebugLoading) {
+                                Spacer(Modifier.width(4.dp))
+                                CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp, color = Color(0xFFFFB74D))
+                            }
                         }
-                        Row(
-                            modifier              = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+
+                        if (debugMsg.isNotEmpty()) {
+                            Text(text = debugMsg, fontSize = 11.sp, color = Color(0xFFFFB74D).copy(alpha = 0.8f))
+                        }
+
+                        // Tambah koin
+                        Text(text = "Tambah", fontSize = 11.sp, color = Color(0xFFFFB74D).copy(alpha = 0.6f))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(100, 300, 700, 1800).forEach { amount ->
                                 OutlinedButton(
                                     onClick = {
-                                        CoinManager.debugAddCoins(context, amount)
-                                        coinBalance = CoinManager.getCachedBalance(context)
+                                        if (!isDebugLoading) {
+                                            isDebugLoading = true
+                                            debugMsg = ""
+                                            scope.launch {
+                                                val res = CoinManager.debugUpdateServerBalance(context, "add", amount)
+                                                when (res) {
+                                                    is CoinManager.DebugCoinResult.Success -> {
+                                                        coinBalance = res.newBalance
+                                                        debugMsg    = "✅ Saldo sekarang: ${res.newBalance} koin"
+                                                    }
+                                                    CoinManager.DebugCoinResult.NetworkError -> debugMsg = "❌ No internet"
+                                                    CoinManager.DebugCoinResult.NoUser       -> debugMsg = "❌ User tidak login"
+                                                    CoinManager.DebugCoinResult.ServerError  -> debugMsg = "❌ Server error"
+                                                }
+                                                isDebugLoading = false
+                                            }
+                                        }
                                     },
-                                    modifier      = Modifier.weight(1f).height(36.dp),
-                                    shape         = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    colors        = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFB74D)),
-                                    border        = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D).copy(alpha = 0.5f))
+                                    enabled        = !isDebugLoading,
+                                    modifier       = Modifier.weight(1f).height(36.dp),
+                                    shape          = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 2.dp),
+                                    colors         = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFB74D)),
+                                    border         = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D).copy(alpha = 0.5f))
                                 ) {
-                                    Text(text = "+$amount", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = "+$amount", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
-                        OutlinedButton(
-                            onClick = {
-                                CoinManager.debugAddCoins(context, -coinBalance)
-                                coinBalance = 0
-                            },
-                            modifier      = Modifier.fillMaxWidth().height(34.dp),
-                            shape         = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp),
-                            colors        = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF9A9A)),
-                            border        = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF9A9A).copy(alpha = 0.4f))
-                        ) {
-                            Text(text = "Reset ke 0", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+                        // Kurangi koin
+                        Text(text = "Kurangi", fontSize = 11.sp, color = Color(0xFFEF9A9A).copy(alpha = 0.6f))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(100, 300, 700).forEach { amount ->
+                                OutlinedButton(
+                                    onClick = {
+                                        if (!isDebugLoading) {
+                                            isDebugLoading = true
+                                            debugMsg = ""
+                                            scope.launch {
+                                                val res = CoinManager.debugUpdateServerBalance(context, "add", -amount)
+                                                when (res) {
+                                                    is CoinManager.DebugCoinResult.Success -> {
+                                                        coinBalance = res.newBalance
+                                                        debugMsg    = "✅ Saldo sekarang: ${res.newBalance} koin"
+                                                    }
+                                                    CoinManager.DebugCoinResult.NetworkError -> debugMsg = "❌ No internet"
+                                                    CoinManager.DebugCoinResult.NoUser       -> debugMsg = "❌ User tidak login"
+                                                    CoinManager.DebugCoinResult.ServerError  -> debugMsg = "❌ Server error"
+                                                }
+                                                isDebugLoading = false
+                                            }
+                                        }
+                                    },
+                                    enabled        = !isDebugLoading,
+                                    modifier       = Modifier.weight(1f).height(36.dp),
+                                    shape          = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 2.dp),
+                                    colors         = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF9A9A)),
+                                    border         = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF9A9A).copy(alpha = 0.5f))
+                                ) {
+                                    Text(text = "-$amount", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Reset ke 0
+                            OutlinedButton(
+                                onClick = {
+                                    if (!isDebugLoading) {
+                                        isDebugLoading = true
+                                        debugMsg = ""
+                                        scope.launch {
+                                            val res = CoinManager.debugUpdateServerBalance(context, "reset")
+                                            when (res) {
+                                                is CoinManager.DebugCoinResult.Success -> {
+                                                    coinBalance = 0
+                                                    debugMsg    = "✅ Koin direset ke 0"
+                                                }
+                                                CoinManager.DebugCoinResult.NetworkError -> debugMsg = "❌ No internet"
+                                                CoinManager.DebugCoinResult.NoUser       -> debugMsg = "❌ User tidak login"
+                                                CoinManager.DebugCoinResult.ServerError  -> debugMsg = "❌ Server error"
+                                            }
+                                            isDebugLoading = false
+                                        }
+                                    }
+                                },
+                                enabled        = !isDebugLoading,
+                                modifier       = Modifier.weight(1f).height(36.dp),
+                                shape          = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp),
+                                colors         = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF9A9A)),
+                                border         = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF9A9A).copy(alpha = 0.5f))
+                            ) {
+                                Text(text = "Reset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
