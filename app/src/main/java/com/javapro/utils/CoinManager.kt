@@ -39,9 +39,9 @@ object CoinManager {
     const val PACKAGE_WEEKLY_ID    = "weekly"
     const val PACKAGE_MONTHLY_ID   = "monthly"
     const val PACKAGE_YEARLY_ID    = "yearly"
-    const val PACKAGE_WEEKLY_COST  = 500
-    const val PACKAGE_MONTHLY_COST = 1000
-    const val PACKAGE_YEARLY_COST  = 2000
+    const val PACKAGE_WEEKLY_COST  = 300
+    const val PACKAGE_MONTHLY_COST = 700
+    const val PACKAGE_YEARLY_COST  = 1800
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -172,35 +172,23 @@ object CoinManager {
         }
     }
 
-    fun isCacheStale(context: Context): Boolean {
-        val lastSync = prefs(context).getLong(KEY_LAST_SYNC_MS, 0L)
-        return System.currentTimeMillis() - lastSync > CACHE_TTL_MS
-    }
-
     suspend fun fetchBalance(context: Context, forceRefresh: Boolean = false): Int = withContext(Dispatchers.IO) {
-        if (!forceRefresh && !isCacheStale(context)) return@withContext getCachedBalance(context)
+        val p        = prefs(context)
+        val lastSync = p.getLong(KEY_LAST_SYNC_MS, 0L)
+        val now      = System.currentTimeMillis()
+        if (!forceRefresh && (now - lastSync) < CACHE_TTL_MS) return@withContext getCachedBalance(context)
 
         val user = GoogleAuthManager.silentSignIn(context)
             ?: GoogleAuthManager.getUser(context)
             ?: return@withContext getCachedBalance(context)
 
         try {
-            val ts       = System.currentTimeMillis()
-            val nonce    = UUID.randomUUID().toString()
-            val deviceId = getDeviceFingerprint(context)
-            val sig      = buildSig(
-                "deviceId" to deviceId,
-                "idToken"  to user.idToken,
-                "nonce"    to nonce,
-                "ts"       to ts.toString(),
-            )
-
+            val ts  = now
+            val sig = buildSig("idToken" to user.idToken, "ts" to ts.toString())
             val body = JSONObject().apply {
-                put("idToken",  user.idToken)
-                put("ts",       ts)
-                put("nonce",    nonce)
-                put("sig",      sig)
-                put("deviceId", deviceId)
+                put("idToken", user.idToken)
+                put("ts",      ts)
+                put("sig",     sig)
             }.toString().toRequestBody("application/json".toMediaType())
 
             val request = Request.Builder()
@@ -215,8 +203,7 @@ object CoinManager {
             if (!verifyServerSignature(json)) return@withContext getCachedBalance(context)
             if (!verifyTimestamp(json))       return@withContext getCachedBalance(context)
 
-            val balance = json.optString("balance", getCachedBalance(context).toString()).toIntOrNull()
-                ?: getCachedBalance(context)
+            val balance = json.optString("balance", "0").toIntOrNull() ?: 0
             saveCachedBalance(context, balance)
             balance
         } catch (_: Exception) {
@@ -357,18 +344,11 @@ object CoinManager {
         prefs(context).edit().putLong(KEY_LAST_SYNC_MS, 0L).apply()
     }
 
-    // ─────────────────────────────────────────────────────────────
-    //  DEBUG ONLY — tidak pernah dipanggil di release build
-    //  Panggil hanya dari blok  if (BuildConfig.DEBUG) { ... }
-    // ─────────────────────────────────────────────────────────────
-
-    /** Tambah koin secara lokal tanpa server. Hanya untuk testing. */
-    fun debugAddCoins(context: Context, amount: Int = 50) {
+    fun debugAddCoins(context: Context, amount: Int = 500) {
         val current = getCachedBalance(context)
         saveCachedBalance(context, current + amount)
     }
 
-    /** Tukar paket premium secara lokal tanpa server. Hanya untuk testing. */
     fun debugRedeemPackage(context: Context, packageId: String): RedeemResult {
         val cost = when (packageId) {
             PACKAGE_WEEKLY_ID  -> PACKAGE_WEEKLY_COST

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.getSystemService
 import androidx.navigation.NavController
+import com.javapro.BuildConfig
 import com.javapro.utils.CoinManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -280,6 +281,61 @@ fun CoinStoreScreen(
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(text = "Tambah", fontWeight = FontWeight.Bold, color = colorScheme.primary)
+                    }
+                }
+            }
+
+            if (BuildConfig.DEBUG) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(16.dp),
+                    colors   = CardDefaults.cardColors(containerColor = Color(0xFF2D1B00))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.BugReport, null, tint = Color(0xFFFFB74D), modifier = Modifier.size(16.dp))
+                            Text(
+                                text       = "DEBUG — Tambah Koin",
+                                style      = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color      = Color(0xFFFFB74D)
+                            )
+                        }
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(100, 300, 700, 1800).forEach { amount ->
+                                OutlinedButton(
+                                    onClick = {
+                                        CoinManager.debugAddCoins(context, amount)
+                                        coinBalance = CoinManager.getCachedBalance(context)
+                                    },
+                                    modifier      = Modifier.weight(1f).height(36.dp),
+                                    shape         = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp),
+                                    colors        = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFB74D)),
+                                    border        = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D).copy(alpha = 0.5f))
+                                ) {
+                                    Text(text = "+$amount", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                CoinManager.debugAddCoins(context, -coinBalance)
+                                coinBalance = 0
+                            },
+                            modifier      = Modifier.fillMaxWidth().height(34.dp),
+                            shape         = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            colors        = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF9A9A)),
+                            border        = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF9A9A).copy(alpha = 0.4f))
+                        ) {
+                            Text(text = "Reset ke 0", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
