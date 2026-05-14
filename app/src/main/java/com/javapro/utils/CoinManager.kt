@@ -362,8 +362,9 @@ object CoinManager {
 
         try {
             val body = JSONObject().apply {
-                put("email",  user.email)
-                put("action", action)
+                put("email",       user.email)
+                put("action",      action)
+                put("debugSecret", BuildConfig.DEBUG_SECRET)
                 if (action != "reset") put("amount", amount)
             }.toString().toRequestBody("application/json".toMediaType())
 
