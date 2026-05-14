@@ -13,6 +13,12 @@ val keystoreProps = Properties().also { props ->
     if (f.exists()) props.load(f.inputStream())
 }
 
+
+val localProps = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) props.load(f.inputStream())
+}
+
 android {
     namespace  = "com.javapro"
     compileSdk = 36
@@ -63,9 +69,11 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("String", "DEBUG_SECRET", ""${localProps["COIN_DEBUG_SECRET"] ?: ""}"")
         }
         debug {
             isDebuggable = true
+            buildConfigField("String", "DEBUG_SECRET", ""${localProps["COIN_DEBUG_SECRET"] ?: ""}"")
         }
     }
 

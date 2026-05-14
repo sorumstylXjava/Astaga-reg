@@ -36,6 +36,12 @@ jobs:
           keyPassword=javapro123
           EOF
 
+
+      - name: Create local.properties
+        run: |
+          cat > local.properties <<EOF
+          COIN_DEBUG_SECRET=${{ secrets.COIN_DEBUG_SECRET }}
+          EOF
       - name: Build APK (Release)
         run: ./gradlew assembleRelease --no-build-cache --rerun-tasks
 
