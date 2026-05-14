@@ -19,6 +19,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import com.javapro.BuildConfig
 
 object CoinManager {
 
