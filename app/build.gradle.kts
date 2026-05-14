@@ -69,11 +69,13 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            buildConfigField("String", "DEBUG_SECRET", ""${localProps["COIN_DEBUG_SECRET"] ?: ""}"")
+            val secret = localProps.getProperty("COIN_DEBUG_SECRET") ?: ""
+            buildConfigField("String", "DEBUG_SECRET", "\"$secret\"")
         }
         debug {
             isDebuggable = true
-            buildConfigField("String", "DEBUG_SECRET", ""${localProps["COIN_DEBUG_SECRET"] ?: ""}"")
+            val secret = localProps.getProperty("COIN_DEBUG_SECRET") ?: ""
+            buildConfigField("String", "DEBUG_SECRET", "\"$secret\"")
         }
     }
 
