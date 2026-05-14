@@ -184,10 +184,16 @@ object CoinManager {
             ?: return@withContext getCachedBalance(context)
 
         try {
-            val ts  = now
-            val sig = buildSig("idToken" to user.idToken, "ts" to ts.toString())
+            val ts    = now
+            val nonce = UUID.randomUUID().toString()
+            val sig   = buildSig(
+                "idToken" to user.idToken,
+                "nonce"   to nonce,
+                "ts"      to ts.toString(),
+            )
             val body = JSONObject().apply {
                 put("idToken", user.idToken)
+                put("nonce",   nonce)
                 put("ts",      ts)
                 put("sig",     sig)
             }.toString().toRequestBody("application/json".toMediaType())
