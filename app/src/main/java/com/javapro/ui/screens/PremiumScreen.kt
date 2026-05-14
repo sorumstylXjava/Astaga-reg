@@ -58,11 +58,23 @@ fun PremiumScreen(navController: NavController, lang: String) {
 
     LaunchedEffect(Unit) {
         isLoading = true
+        val localType   = PremiumManager.getPremiumType(context)
+        val localExpiry = PremiumManager.getExpiryMs(context)
+        val localCoinRewardActive = localType == "coin_reward" &&
+            System.currentTimeMillis() < localExpiry
+
         val result = PremiumManager.checkOnline(context)
-        isPremium   = result
-        premiumType = PremiumManager.getPremiumType(context)
-        expiryMs    = PremiumManager.getExpiryMs(context)
-        isLoading   = false
+
+        if (!result && localCoinRewardActive) {
+            isPremium   = true
+            premiumType = localType
+            expiryMs    = localExpiry
+        } else {
+            isPremium   = result
+            premiumType = PremiumManager.getPremiumType(context)
+            expiryMs    = PremiumManager.getExpiryMs(context)
+        }
+        isLoading = false
     }
 
     if (isLoading) {

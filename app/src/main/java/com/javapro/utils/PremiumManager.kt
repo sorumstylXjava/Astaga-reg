@@ -194,7 +194,12 @@ object PremiumManager {
                 val email   = json.optString("email", "")
 
                 prefs(context).edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
-                if (!premium) {
+                val localType   = prefs(context).getString(KEY_TYPE, null)
+                val localExpiry = prefs(context).getLong(KEY_EXPIRY, 0L)
+                val localCoinRewardActive = localType == "coin_reward" &&
+                    System.currentTimeMillis() < localExpiry
+
+                if (!premium && !localCoinRewardActive) {
                     clearCacheAndPremium(context)
                 } else {
                     saveCache(context, premium, type.ifEmpty { null }, expiry, email.ifEmpty { null })
@@ -206,10 +211,12 @@ object PremiumManager {
         }
 
     fun grantCoinRewardLocally(context: Context, packageId: String, expiryMs: Long) {
+        val email = prefs(context).getString(KEY_EMAIL, null)
         prefs(context).edit().apply {
             putBoolean(KEY_VERIFIED, true)
-            putString(KEY_TYPE, "coin_reward")
-            putLong(KEY_EXPIRY, expiryMs)
+            putString(KEY_TYPE,   "coin_reward")
+            putLong(KEY_EXPIRY,   expiryMs)
+            if (email != null) putString(KEY_EMAIL, email)
             apply()
         }
     }
