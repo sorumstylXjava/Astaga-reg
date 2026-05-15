@@ -90,24 +90,6 @@ fun PremiumScreen(navController: NavController, lang: String) {
     val accentPermanent = Color(0xFFAB47BC)
     val accentGreen     = Color(0xFF4CAF50)
 
-    // ── State untuk payment method sheet ──────────────────────────────────────
-    var showPaymentSheet  by remember { mutableStateOf(false) }
-    var pendingPkgType    by remember { mutableStateOf("") }
-    var pendingPkgAmount  by remember { mutableIntStateOf(0) }
-    var pendingPkgLabel   by remember { mutableStateOf("") }
-
-    if (showPaymentSheet) {
-        PaymentMethodSheet(
-            packageType   = pendingPkgType,
-            packageLabel  = pendingPkgLabel,
-            amountIdr     = pendingPkgAmount,
-            email         = googleUser?.email ?: "",
-            context       = context,
-            navController = navController,
-            onDismiss     = { showPaymentSheet = false }
-        )
-    }
-
     val planAccentColor = when (premiumType) {
         "weekly"    -> accentWeekly
         "monthly"   -> accentMonthly
@@ -418,7 +400,7 @@ fun PremiumScreen(navController: NavController, lang: String) {
                         accentColor = accentWeekly,
                         buttonLabel = context.getString(R.string.action_buy),
                         enabled     = email.isNotEmpty(),
-                        onClick     = { pendingPkgType = "weekly";    pendingPkgAmount = 10000; pendingPkgLabel = "Plus (7 hari)";    showPaymentSheet = true }
+                        onClick     = { openTelegramBot(context, "weekly",    email); navController.navigate("payment_pending/weekly/${Uri.encode(email)}") }
                     )
                     PremiumPackageCard(
                         modifier    = Modifier.weight(1f),
@@ -429,7 +411,7 @@ fun PremiumScreen(navController: NavController, lang: String) {
                         accentColor = accentMonthly,
                         buttonLabel = context.getString(R.string.action_buy),
                         enabled     = email.isNotEmpty(),
-                        onClick     = { pendingPkgType = "monthly";   pendingPkgAmount = 20000; pendingPkgLabel = "Plus+ (30 hari)";  showPaymentSheet = true }
+                        onClick     = { openTelegramBot(context, "monthly",   email); navController.navigate("payment_pending/monthly/${Uri.encode(email)}") }
                     )
                 }
 
@@ -443,7 +425,7 @@ fun PremiumScreen(navController: NavController, lang: String) {
                         accentColor = Color(0xFFFF8F00),
                         buttonLabel = context.getString(R.string.action_buy),
                         enabled     = email.isNotEmpty(),
-                        onClick     = { pendingPkgType = "yearly";    pendingPkgAmount = 50000; pendingPkgLabel = "Plus★ (365 hari)"; showPaymentSheet = true }
+                        onClick     = { openTelegramBot(context, "yearly",    email); navController.navigate("payment_pending/yearly/${Uri.encode(email)}") }
                     )
                     PremiumPackageCard(
                         modifier    = Modifier.weight(1f),
@@ -454,7 +436,7 @@ fun PremiumScreen(navController: NavController, lang: String) {
                         accentColor = accentPermanent,
                         buttonLabel = context.getString(R.string.action_buy),
                         enabled     = email.isNotEmpty(),
-                        onClick     = { pendingPkgType = "permanent"; pendingPkgAmount = 80000; pendingPkgLabel = "King (Selamanya)"; showPaymentSheet = true }
+                        onClick     = { openTelegramBot(context, "permanent", email); navController.navigate("payment_pending/permanent/${Uri.encode(email)}") }
                     )
                 }
 
@@ -664,196 +646,13 @@ private fun PremiumPackageCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PaymentMethodSheet(
-    packageType   : String,
-    packageLabel  : String,
-    amountIdr     : Int,
-    email         : String,
-    context       : Context,
-    navController : NavController,
-    onDismiss     : () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val amountUsd  = when (packageType) {
-        "weekly"    -> "0.63"
-        "monthly"   -> "1.25"
-        "yearly"    -> "3.13"
-        "permanent" -> "4.67"
-        else        -> "0.63"
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState       = sheetState,
-        containerColor   = MaterialTheme.colorScheme.surface,
-        shape            = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.payment_sheet_title), fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                Text(
-                    stringResource(R.string.payment_sheet_package, packageLabel),
-                    fontSize = 13.sp,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            HorizontalDivider()
-
-            // ── Saweria — Indonesia ────────────────────────────────────────────
-            PaymentOptionCard(
-                flag        = "🇮🇩",
-                name        = stringResource(R.string.payment_saweria_name),
-                description = stringResource(R.string.payment_saweria_desc),
-                amount      = "Rp ${"%,d".format(amountIdr).replace(',', '.')}",
-                color       = Color(0xFF00ACC1),
-                recommended = true,
-                recommendedLabel = stringResource(R.string.payment_recommended),
-                onClick     = {
-                    onDismiss()
-                    openPayment(context, email, packageType, "saweria")
-                    navController.navigate("payment_pending/$packageType/${Uri.encode(email)}")
-                }
-            )
-
-            // ── Sociabuzz — Global ─────────────────────────────────────────────
-            PaymentOptionCard(
-                flag        = "🌍",
-                name        = stringResource(R.string.payment_sociabuzz_name),
-                description = stringResource(R.string.payment_sociabuzz_desc),
-                amount      = "USD $$amountUsd",
-                color       = Color(0xFF7B1FA2),
-                recommended = false,
-                recommendedLabel = stringResource(R.string.payment_recommended),
-                onClick     = {
-                    onDismiss()
-                    openPayment(context, email, packageType, "sociabuzz")
-                    navController.navigate("payment_pending/$packageType/${Uri.encode(email)}")
-                }
-            )
-
-            // ── Info pesan ─────────────────────────────────────────────────────
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                shape  = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier              = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment     = Alignment.Top
-                ) {
-                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(15.dp).padding(top = 1.dp))
-                    Text(
-                        stringResource(R.string.payment_auto_message_info),
-                        fontSize   = 11.sp,
-                        color      = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaymentOptionCard(
-    flag             : String,
-    name             : String,
-    description      : String,
-    amount           : String,
-    color            : Color,
-    recommended      : Boolean,
-    recommendedLabel : String = "Rekomendasi",
-    onClick          : () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(16.dp),
-        colors   = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.07f)),
-        border   = BorderStroke(1.5.dp, color.copy(alpha = if (recommended) 0.6f else 0.25f))
-    ) {
-        Row(
-            modifier              = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
-            // Flag emoji
-            Box(
-                modifier         = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(flag, fontSize = 22.sp)
-            }
-
-            // Info
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Text(name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = color)
-                    if (recommended) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = color.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                recommendedLabel,
-                                fontSize   = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color      = color,
-                                modifier   = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-                Text(description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 15.sp)
-                Text(amount, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
-            }
-
-            Icon(Icons.Default.ChevronRight, null, tint = color, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-private fun openPayment(context: Context, email: String, packageType: String, platform: String = "saweria") {
-    val amountIdr = when (packageType) {
-        "weekly"    -> 10000
-        "monthly"   -> 20000
-        "yearly"    -> 50000
-        "permanent" -> 80000
-        else        -> 0
-    }
-    val amountUsd = when (packageType) {
-        "weekly"    -> "0.63"
-        "monthly"   -> "1.25"
-        "yearly"    -> "3.13"
-        "permanent" -> "4.67"
-        else        -> "0.63"
-    }
-    val message = Uri.encode("$packageType|$email")
-
-    val url = when (platform) {
-        "saweria"   -> "https://saweria.co/Javakids?amount=$amountIdr&message=$message"
-        "sociabuzz" -> "https://sociabuzz.com/javakids/tribe?amount=$amountUsd&message=$message"
-        else        -> "https://saweria.co/Javakids?amount=$amountIdr&message=$message"
-    }
-
+private fun openTelegramBot(context: Context, packageType: String, email: String) {
+    val raw     = "$packageType|$email"
+    val encoded = android.util.Base64.encodeToString(
+        raw.toByteArray(),
+        android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP
+    ).trimEnd('=')
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/JavaProUser_bot?start=$encoded")))
     }
 }

@@ -102,11 +102,11 @@ fun PaymentPendingScreen(
         else  -> "Back to Premium Page"
     }
     val strStartUsing = when (lang) {
-        "id"  -> "Mulai Pakai JavaPro Pro!"
-        "zh"  -> "开始使用 JavaPro Pro！"
-        "hi"  -> "JavaPro Pro का उपयोग शुरू करें!"
-        "fil" -> "Simulan Gamitin ang JavaPro Pro!"
-        else  -> "Start Using JavaPro Pro!"
+        "id"  -> "Mulai Pakai JavaPro Plus!"
+        "zh"  -> "开始使用 JavaPro Plus！"
+        "hi"  -> "JavaPro Plus का उपयोग शुरू करें!"
+        "fil" -> "Simulan Gamitin ang JavaPro Plus!"
+        else  -> "Start Using JavaPro Plus!"
     }
 
     Scaffold(
@@ -312,11 +312,11 @@ private fun SuccessCard(email: String, packageType: String, lang: String) {
         else  -> "Premium Active! 🎉"
     }
     val strDesc = when (lang) {
-        "id"  -> "Terima kasih! Paket ${packageType.replaceFirstChar { it.uppercase() }} kamu sudah aktif. Selamat menikmati semua fitur JavaPro Pro!"
-        "zh"  -> "感谢您！您的 ${packageType.replaceFirstChar { it.uppercase() }} 套餐已激活。享受 JavaPro Pro 的所有功能！"
-        "hi"  -> "धन्यवाद! आपका ${packageType.replaceFirstChar { it.uppercase() }} पैकेज सक्रिय हो गया है। JavaPro Pro की सभी सुविधाओं का आनंद लें!"
-        "fil" -> "Salamat! Ang iyong ${packageType.replaceFirstChar { it.uppercase() }} package ay aktibo na. I-enjoy ang lahat ng features ng JavaPro Pro!"
-        else  -> "Thank you! Your ${packageType.replaceFirstChar { it.uppercase() }} package is now active. Enjoy all JavaPro Pro features!"
+        "id"  -> "Terima kasih! Paket ${packageType.replaceFirstChar { it.uppercase() }} kamu sudah aktif. Selamat menikmati semua fitur JavaPro Plus!"
+        "zh"  -> "感谢您！您的 ${packageType.replaceFirstChar { it.uppercase() }} 套餐已激活。享受 JavaPro Plus 的所有功能！"
+        "hi"  -> "धन्यवाद! आपका ${packageType.replaceFirstChar { it.uppercase() }} पैकेज सक्रिय हो गया है। JavaPro Plus की सभी सुविधाओं का आनंद लें!"
+        "fil" -> "Salamat! Ang iyong ${packageType.replaceFirstChar { it.uppercase() }} package ay aktibo na. I-enjoy ang lahat ng features ng JavaPro Plus!"
+        else  -> "Thank you! Your ${packageType.replaceFirstChar { it.uppercase() }} package is now active. Enjoy all JavaPro Plus features!"
     }
 
     Card(
@@ -429,42 +429,47 @@ private fun StepsCard(email: String, packageType: String, lang: String) {
     }
     val steps = when (lang) {
         "id" -> listOf(
-            "Kamu transfer di Saweria/Sociabuzz dengan pesan yang sudah terisi otomatis",
-            "Sistem menerima notifikasi pembayaran dari Saweria/Sociabuzz secara otomatis",
-            "Email $email langsung di-grant premium paket ${packageType.replaceFirstChar { it.uppercase() }}",
-            "Buka ulang halaman Premium di JavaPro untuk memuat status terbaru"
+            "Klik tombol Beli di aplikasi JavaPro → bot Telegram JavaPro terbuka otomatis",
+            "Di bot, pilih paket & metode bayar (Saweria untuk Indonesia, Sociabuzz untuk luar negeri)",
+            "Selesaikan pembayaran sesuai nominal yang tertera di bot",
+            "Kirim screenshot bukti pembayaran ke bot Telegram",
+            "Bot akan notif kamu saat premium dikonfirmasi — buka halaman ini untuk melihat status"
         )
         "zh" -> listOf(
-            "您在 Saweria/Sociabuzz 进行转账，消息已自动填写",
-            "系统自动接收来自 Saweria/Sociabuzz 的付款通知",
-            "电子邮件 $email 立即获得 ${packageType.replaceFirstChar { it.uppercase() }} 套餐高级权限",
-            "重新打开 JavaPro 中的高级页面以加载最新状态"
+            "在 JavaPro 应用中点击购买 → 自动打开 JavaPro Telegram 机器人",
+            "在机器人中选择套餐和支付方式（印尼用 Saweria，国际用 Sociabuzz）",
+            "按机器人显示的金额完成付款",
+            "将付款截图发送到 Telegram 机器人",
+            "机器人确认后会通知您 — 打开此页面查看状态"
         )
         "hi" -> listOf(
-            "आप Saweria/Sociabuzz पर स्वचालित रूप से भरे संदेश के साथ ट्रांसफर करें",
-            "सिस्टम Saweria/Sociabuzz से स्वचालित रूप से भुगतान सूचना प्राप्त करता है",
-            "ईमेल $email को तुरंत ${packageType.replaceFirstChar { it.uppercase() }} पैकेज का प्रीमियम मिलता है",
-            "नवीनतम स्थिति लोड करने के लिए JavaPro में Premium पेज फिर से खोलें"
+            "JavaPro ऐप में Buy बटन टैप करें → JavaPro Telegram बॉट अपने आप खुलेगा",
+            "बॉट में पैकेज और भुगतान विधि चुनें (भारत के लिए Saweria, अंतर्राष्ट्रीय के लिए Sociabuzz)",
+            "बॉट में दिखाई गई राशि के अनुसार भुगतान पूरा करें",
+            "भुगतान का स्क्रीनशॉट Telegram बॉट को भेजें",
+            "बॉट द्वारा कन्फर्म होने पर नोटिफिकेशन मिलेगा — इस पेज को खोलें"
         )
         "fil" -> listOf(
-            "Mag-transfer ka sa Saweria/Sociabuzz gamit ang awtomatikong nalagay na mensahe",
-            "Awtomatikong natatanggap ng system ang notification ng bayad mula Saweria/Sociabuzz",
-            "Ang email $email ay agad na bibigyan ng premium na ${packageType.replaceFirstChar { it.uppercase() }} package",
-            "Buksan muli ang Premium page sa JavaPro para i-load ang pinakabagong status"
+            "I-tap ang Buy sa JavaPro app → awtomatikong magbubukas ang JavaPro Telegram bot",
+            "Sa bot, pumili ng pakete at paraan ng bayad (Saweria para sa Pilipinas, Sociabuzz para sa ibang bansa)",
+            "Kumpletuhin ang bayad ayon sa halagang ipinapakita ng bot",
+            "Magpadala ng screenshot ng patunay ng bayad sa Telegram bot",
+            "Ipapaalam ng bot kapag nakumpirma — buksan ang page na ito para makita ang status"
         )
         else -> listOf(
-            "Transfer on Saweria/Sociabuzz with the automatically filled message",
-            "The system automatically receives payment notifications from Saweria/Sociabuzz",
-            "Email $email is immediately granted ${packageType.replaceFirstChar { it.uppercase() }} premium package",
-            "Reopen the Premium page in JavaPro to load the latest status"
+            "Tap Buy in the JavaPro app → the JavaPro Payment Telegram bot opens automatically",
+            "In the bot, select your package and payment method (Saweria for Indonesia, Sociabuzz for international)",
+            "Complete the payment for the exact amount shown in the bot",
+            "Send your payment screenshot to the Telegram bot",
+            "The bot will notify you when confirmed — open this page to see your status"
         )
     }
     val strTip = when (lang) {
-        "id"  -> "💡 Pastikan pesan donasi tidak diubah agar email kamu terdeteksi otomatis oleh sistem."
-        "zh"  -> "💡 请确保不要更改捐款消息，以便系统自动检测您的电子邮件。"
-        "hi"  -> "💡 सुनिश्चित करें कि डोनेशन संदेश न बदलें ताकि सिस्टम आपका ईमेल स्वचालित रूप से पहचान सके।"
-        "fil" -> "💡 Siguraduhing hindi binabago ang mensahe ng donasyon para awtomatikong matukoy ng system ang iyong email."
-        else  -> "💡 Make sure the donation message is not changed so the system can automatically detect your email."
+        "id"  -> "💡 Jangan tutup bot Telegram sebelum mengirim screenshot bukti pembayaran."
+        "zh"  -> "💡 发送付款截图前不要关闭 Telegram 机器人。"
+        "hi"  -> "💡 भुगतान का स्क्रीनशॉट भेजने से पहले Telegram बॉट बंद न करें।"
+        "fil" -> "💡 Huwag isara ang Telegram bot bago magpadala ng screenshot ng bayad."
+        else  -> "💡 Don't close the Telegram bot before sending your payment screenshot."
     }
 
     Card(
