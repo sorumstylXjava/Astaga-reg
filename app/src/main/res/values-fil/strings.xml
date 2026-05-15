@@ -431,7 +431,7 @@
 <string name="premium_help_msg">Kumusta, kailangan ko ng tulong sa pag-activate ng aking premium key\nDevice ID: %1$s</string>
 <string name="premium_price_weekly">$0.63</string>
 <string name="premium_price_monthly">$1.25</string>
-<string name="premium_price_yearly">$2.67</string>
+<string name="premium_price_yearly">$3.10</string>
 <string name="premium_price_permanent">$4.67</string>
 <string name="premium_key_activation_title">Pag-activate ng Key</string>
 <string name="premium_enter_key_hint">Ilagay ang Activation Key</string>

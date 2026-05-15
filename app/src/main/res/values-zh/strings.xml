@@ -431,7 +431,7 @@
 <string name="premium_help_msg">您好，我需要帮助激活我的高级密钥\n设备ID：%1$s</string>
 <string name="premium_price_weekly">$0.63</string>
 <string name="premium_price_monthly">$1.25</string>
-<string name="premium_price_yearly">$2.67</string>
+<string name="premium_price_yearly">$3.10</string>
 <string name="premium_price_permanent">$4.67</string>
 <string name="premium_key_activation_title">密钥激活</string>
 <string name="premium_enter_key_hint">输入激活密钥</string>

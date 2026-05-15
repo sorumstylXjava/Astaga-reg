@@ -167,8 +167,9 @@ object PremiumManager {
                 }
             }
 
-            var user = GoogleAuthManager.silentSignIn(context)
-                ?: GoogleAuthManager.getUser(context)
+            var user = if (GoogleAuthManager.isSignedIn(context)) {
+                GoogleAuthManager.silentSignIn(context) ?: GoogleAuthManager.getUser(context)
+            } else null
 
             if (user == null) return@withContext isPremium(context)
 

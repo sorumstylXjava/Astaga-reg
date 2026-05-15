@@ -431,7 +431,7 @@
 <string name="premium_help_msg">Hello, I need help activating my premium key\nDevice ID: %1$s</string>
 <string name="premium_price_weekly">$0.63</string>
 <string name="premium_price_monthly">$1.25</string>
-<string name="premium_price_yearly">$2.67</string>
+<string name="premium_price_yearly">$3.10</string>
 <string name="premium_price_permanent">$4.67</string>
 <string name="premium_key_activation_title">Key Activation</string>
 <string name="premium_enter_key_hint">Enter Activation Key</string>
