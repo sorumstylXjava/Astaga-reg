@@ -86,6 +86,8 @@ fun GameBoostDetailScreen(
     // Gate iklan — onGranted hanya dipanggil kalau user sudah nonton minimal 8 detik
     // Kalau skip sebelum 8 detik, callback TIDAK dieksekusi
     val adStartTimeRef = remember { mutableStateOf(0L) }
+    val isPremium = remember { PremiumManager.isRealPremium(context) }
+    var showPremiumSheet by remember { mutableStateOf(false) }
 
     val showAdSafe: (((() -> Unit) -> Unit)) = { onGranted ->
         if (isPremium) {
@@ -154,8 +156,6 @@ fun GameBoostDetailScreen(
     var autoRamEnabled by remember { mutableStateOf(false) }
     var autoRamInterval by remember { mutableStateOf(15) }
     var isAutoRamScheduled by remember { mutableStateOf(false) }
-    val isPremium = remember { PremiumManager.isRealPremium(context) }
-    var showPremiumSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(packageName) {
         resetPrefsIfNeeded(context)
