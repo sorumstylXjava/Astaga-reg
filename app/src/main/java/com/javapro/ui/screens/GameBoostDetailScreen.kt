@@ -88,11 +88,15 @@ fun GameBoostDetailScreen(
     val adStartTimeRef = remember { mutableStateOf(0L) }
 
     val showAdSafe: (((() -> Unit) -> Unit)) = { onGranted ->
-        adStartTimeRef.value = System.currentTimeMillis()
-        onShowAd {
-            val elapsed = System.currentTimeMillis() - adStartTimeRef.value
-            if (elapsed >= 8_000L) {
-                onGranted()
+        if (isPremium) {
+            onGranted()
+        } else {
+            adStartTimeRef.value = System.currentTimeMillis()
+            onShowAd {
+                val elapsed = System.currentTimeMillis() - adStartTimeRef.value
+                if (elapsed >= 8_000L) {
+                    onGranted()
+                }
             }
         }
     }
